@@ -4,9 +4,11 @@
     "depends": ["point_of_sale"],
     "author": "Shelton / Labodega",
     "category": "Point of Sale",
-    "data": [
-        "views/assets.xml",
-    ],
-    "assets": {},
+    "data": [],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "labodega_pos/static/src/js/magellan_scale_service.js",
+        ],
+    },
     "installable": True,
 }
