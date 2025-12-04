@@ -13,15 +13,19 @@ const magellanBarcodeReaderService = {
         console.log("[Magellan] magellan_barcode_reader service start – patching barcode_reader");
 
         const barcodeReader = barcode_reader;
+        console.log("barcodeReader", barcodeReader)
+        console.log("barcodeReader type", typeof barcodeReader.register)
         if (!barcodeReader || typeof barcodeReader.register !== "function") {
             console.warn("[Magellan] barcode_reader service not available or invalid");
             return barcodeReader;
         }
 
         const originalRegister = barcodeReader.register.bind(barcodeReader);
+        console.log("originalRegister", originalRegister)
 
         barcodeReader.register = function (cbMap, exclusive) {
             // cbMap is the callback map passed by useBarcodeReader({ product() { ... }, ... })
+            console.log("inside barcodeReader.register")
             if (cbMap && typeof cbMap.product === "function") {
                 const originalProductCb = cbMap.product;
 
