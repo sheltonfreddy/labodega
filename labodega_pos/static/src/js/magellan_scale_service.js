@@ -27,17 +27,20 @@ const magellanBarcodeReaderService = {
             // cbMap is the callback map passed by useBarcodeReader({ product() { ... }, ... })
             console.log("inside barcodeReader.register")
             if (cbMap && typeof cbMap.product === "function") {
+                console.log("typeof cbMap.product", typeof cbMap.product)
                 const originalProductCb = cbMap.product;
 
                 cbMap.product = async function (parsedBarcode) {
                     // In callbacks, `this` is the POS screen component (see barcode_reader_hook.js),
                     // so `this.pos` is the POS instance.
+                    console.log("parsedBarcode", parsedBarcode)
                     try {
                         const pos = this.pos;
                         const code = parsedBarcode && parsedBarcode.code;
-
+                        console.log("pos && pos.db && code", pos,pos.db,code)
                         if (pos && pos.db && code) {
                             const product = pos.db.get_product_by_barcode(code);
+                            console.log("product", product, product.to_weight)
 
                             if (product && product.to_weight) {
                                 console.log(
