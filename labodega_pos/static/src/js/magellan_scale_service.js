@@ -4,50 +4,53 @@ import { registry } from "@web/core/registry";
 
 console.log("[Magellan] magellan_scale_service.js loaded");
 
-// This service depends on the existing "barcode_reader" service.
-// Its whole job is to PATCH barcode_reader.register so that
-// weighted products ask the Flask bridge for a weight.
+// New service that *wraps* the core barcode_reader service
 const magellanBarcodeReaderService = {
     dependencies: ["barcode_reader"],
     start(env, { barcode_reader }) {
-        console.log("[Magellan] magellan_barcode_reader service start – patching barcode_reader");
+        console.log("[Magellan] magellan_barcode_reader service start – got barcode_reader:", barcode_reader);
 
         const barcodeReader = barcode_reader;
-        console.log("barcodeReader", barcodeReader)
-        console.log("barcodeReader type", typeof barcodeReader.register)
         if (!barcodeReader || typeof barcodeReader.register !== "function") {
             console.warn("[Magellan] barcode_reader service not available or invalid");
             return barcodeReader;
         }
 
+        // ---- Patch scan() just to see if ANY scan reaches the service ----
+        if (typeof barcodeReader.scan === "function") {
+            const originalScan = barcodeReader.scan.bind(barcodeReader);
+            barcodeReader.scan = function (code) {
+                console.log("[Magellan] barcodeReader.scan called with code:", code);
+                return originalScan(code);
+            };
+        } else {
+            console.warn("[Magellan] barcode_reader.scan is not a function");
+        }
+
+        // ---- Patch register() so we can log registrations AND wrap product ----
         const originalRegister = barcodeReader.register.bind(barcodeReader);
-        console.log("originalRegister", originalRegister)
 
         barcodeReader.register = function (cbMap, exclusive) {
-            // cbMap is the callback map passed by useBarcodeReader({ product() { ... }, ... })
-            console.log("inside barcodeReader.register")
+            console.log("[Magellan] barcodeReader.register called. Keys:", Object.keys(cbMap || {}), "exclusive:", exclusive);
+
             if (cbMap && typeof cbMap.product === "function") {
-                console.log("typeof cbMap.product", typeof cbMap.product)
                 const originalProductCb = cbMap.product;
 
                 cbMap.product = async function (parsedBarcode) {
-                    // In callbacks, `this` is the POS screen component (see barcode_reader_hook.js),
-                    // so `this.pos` is the POS instance.
-                    console.log("parsedBarcode", parsedBarcode)
+                    console.log("[Magellan] product callback hit. parsedBarcode:", parsedBarcode);
+
                     try {
                         const pos = this.pos;
                         const code = parsedBarcode && parsedBarcode.code;
-                        console.log("pos && pos.db && code", pos,pos.db,code)
+
+                        console.log("[Magellan] product callback this.pos:", !!pos, "code:", code);
+
                         if (pos && pos.db && code) {
                             const product = pos.db.get_product_by_barcode(code);
-                            console.log("product", product, product.to_weight)
+                            console.log("[Magellan] product from POS DB:", product);
 
                             if (product && product.to_weight) {
-                                console.log(
-                                    "[Magellan] Weighted product via barcode:",
-                                    code,
-                                    product.display_name
-                                );
+                                console.log("[Magellan] Detected weighted product:", product.display_name);
 
                                 let weight = null;
 
@@ -57,14 +60,13 @@ const magellanBarcodeReaderService = {
                                         headers: { Accept: "application/json" },
                                     });
 
+                                    console.log("[Magellan] Bridge HTTP status:", response.status);
+
                                     if (!response.ok) {
-                                        console.warn(
-                                            "[Magellan] Bridge HTTP error:",
-                                            response.status
-                                        );
+                                        console.warn("[Magellan] Bridge HTTP error:", response.status);
                                     } else {
                                         const data = await response.json();
-                                        console.log("[Magellan] Bridge response:", data);
+                                        console.log("[Magellan] Bridge JSON response:", data);
 
                                         if (
                                             data &&
@@ -81,14 +83,13 @@ const magellanBarcodeReaderService = {
                                         }
                                     }
                                 } catch (err) {
-                                    console.error(
-                                        "[Magellan] Error calling weight bridge:",
-                                        err
-                                    );
+                                    console.error("[Magellan] Error calling weight bridge:", err);
                                 }
 
                                 if (weight && weight > 0) {
                                     const order = pos.get_order();
+                                    console.log("[Magellan] Current order:", order);
+
                                     if (order) {
                                         order.add_product(product, { quantity: weight });
                                         console.log(
@@ -97,8 +98,7 @@ const magellanBarcodeReaderService = {
                                             "qty =",
                                             weight
                                         );
-                                        // IMPORTANT: do NOT call originalProductCb here
-                                        // → prevents extra qty=1 line.
+                                        // Do NOT call the original callback → avoid extra qty=1
                                         return;
                                     }
                                 } else {
@@ -117,14 +117,13 @@ const magellanBarcodeReaderService = {
                 };
             }
 
-            // Register callbacks (possibly wrapped)
+            // Always call original register so POS still works
             return originalRegister(cbMap, exclusive);
         };
 
-        // Return the (patched) barcodeReader instance
         return barcodeReader;
     },
 };
 
-// IMPORTANT: new service name -> no conflict with "barcode_reader"
+// Register a *new* service (no name conflict)
 registry.category("services").add("magellan_barcode_reader", magellanBarcodeReaderService);
