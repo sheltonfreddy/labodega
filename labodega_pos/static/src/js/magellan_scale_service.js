@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
+import { BRIDGE_CONFIG } from "./magellan_config";
 
 console.log("[Magellan] magellan_scale_service.js loaded");
 
@@ -15,34 +16,34 @@ async function startBarcodePolling() {
 
     while (true) {
         try {
-            const response = await fetch("http://127.0.0.1:5001/next_barcode", {
+            const response = await fetch(`${BRIDGE_CONFIG.BRIDGE_URL}/barcode`, {
                 method: "GET",
                 headers: { Accept: "application/json" },
                 cache: "no-cache",
             });
 
             if (!response.ok) {
-                console.warn("[Magellan] /next_barcode HTTP error:", response.status);
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+                console.warn("[Magellan] /barcode HTTP error:", response.status);
+                await new Promise((resolve) => setTimeout(resolve, BRIDGE_CONFIG.CONNECTION_ERROR_DELAY));
                 continue;
             }
 
             const data = await response.json();
-            if (data.success && data.code) {
-                console.log("[Magellan] Got barcode from bridge:", data.code);
+            if (data.barcode) {
+                console.log("[Magellan] Got barcode from bridge:", data.barcode);
                 try {
-                    window.magellanBarcodeReader.scan(data.code);
+                    window.magellanBarcodeReader.scan(data.barcode);
                 } catch (err) {
                     console.error("[Magellan] Error calling barcodeReader.scan:", err);
                 }
             } else {
-                // timeout / no barcode → just loop again
-                // console.log("[Magellan] No barcode from bridge this cycle");
+                // no barcode → just loop again (poll every 200ms)
+                await new Promise((resolve) => setTimeout(resolve, BRIDGE_CONFIG.BARCODE_POLL_INTERVAL));
             }
         } catch (err) {
-            console.error("[Magellan] Error while polling /next_barcode:", err);
+            console.error("[Magellan] Error while polling /barcode:", err);
             // backoff a bit on errors
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, BRIDGE_CONFIG.ERROR_RETRY_DELAY));
         }
     }
 }
@@ -102,7 +103,7 @@ const magellanBarcodeReaderService = {
                                 let weight = null;
                                 try {
                                     const response = await fetch(
-                                        "http://127.0.0.1:5001/weight",
+                                        `${BRIDGE_CONFIG.BRIDGE_URL}/weight`,
                                         {
                                             method: "GET",
                                             headers: { Accept: "application/json" },
@@ -125,8 +126,8 @@ const magellanBarcodeReaderService = {
 
                                         if (
                                             data &&
-                                            data.success &&
                                             typeof data.weight === "number" &&
+                                            data.weight !== null &&
                                             data.weight > 0
                                         ) {
                                             weight = data.weight;
@@ -135,6 +136,9 @@ const magellanBarcodeReaderService = {
                                                 "[Magellan] /weight returned invalid weight:",
                                                 data
                                             );
+                                            if (data.error) {
+                                                console.error("[Magellan] Bridge error:", data.error);
+                                            }
                                         }
                                     }
                                 } catch (err) {

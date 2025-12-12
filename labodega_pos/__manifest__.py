@@ -7,6 +7,7 @@
     "data": [],
     "assets": {
         "point_of_sale._assets_pos": [
+            "labodega_pos/static/src/js/magellan_config.js",
             "labodega_pos/static/src/js/magellan_scale_service.js",
         ],
     },
