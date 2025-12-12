@@ -10,7 +10,7 @@ export const BRIDGE_CONFIG = {
     // Bridge server URL
     // For localhost (development/testing): "http://127.0.0.1:8000"
     // For remote Pi: "http://192.168.1.100:8000" (use your Pi's IP)
-    BRIDGE_URL: "http://127.0.0.1:8000",
+    BRIDGE_URL: "http://10.0.0.35:8000",
 
     // Polling interval in milliseconds
     // Lower = more responsive but more CPU/network usage
