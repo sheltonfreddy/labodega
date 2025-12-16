@@ -19,10 +19,16 @@ async function startBarcodePolling() {
     console.log("[Magellan] Pi bridge:", bridgeUrl);
     console.log("[Magellan] Browser → Odoo (HTTPS) → Pi (HTTP) to avoid mixed content");
 
+    let pollCount = 0;
     while (true) {
         try {
             // Use Odoo proxy to avoid mixed content HTTPS→HTTP issue
             const odooProxyUrl = `/labodega_pos/proxy/barcode?bridge_url=${encodeURIComponent(bridgeUrl)}`;
+
+            pollCount++;
+            if (pollCount % 50 === 0) {
+                console.log(`[Magellan] Barcode poll #${pollCount} - fetching: ${odooProxyUrl}`);
+            }
 
             const response = await fetch(odooProxyUrl, {
                 method: 'GET',
@@ -37,8 +43,13 @@ async function startBarcodePolling() {
 
             const data = await response.json();
 
+            // Debug: log every 50th response to see what we're getting
+            if (pollCount % 50 === 0) {
+                console.log(`[Magellan] Poll #${pollCount} response:`, data);
+            }
+
             if (data && data.barcode) {
-                console.log("[Magellan] Got barcode via Odoo proxy:", data.barcode);
+                console.log("[Magellan] ✅ Got barcode via Odoo proxy:", data.barcode);
                 try {
                     window.magellanBarcodeReader.scan(data.barcode);
                 } catch (err) {
@@ -49,7 +60,8 @@ async function startBarcodePolling() {
                 await new Promise((resolve) => setTimeout(resolve, 200));
             }
         } catch (err) {
-            console.error("[Magellan] Odoo proxy error:", err.message);
+            console.error("[Magellan] ❌ Odoo proxy error:", err.message);
+            console.error("[Magellan] Full error:", err);
             // backoff a bit on errors
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
@@ -91,13 +103,21 @@ const magellanBarcodeReaderService = {
             if (cbMap && typeof cbMap.product === "function") {
                 const originalProductCb = cbMap.product;
 
-                // Use arrow function to preserve `this` context
+                // Store the callback owner context (usually the ProductScreen component)
+                let callbackContext = null;
+
+                // Wrapper function for weighted products
                 const wrappedProductCb = async function (parsedBarcode) {
+                    // Capture the context on first call
+                    if (!callbackContext) {
+                        callbackContext = this;
+                    }
+
                     console.log("[Magellan] product callback hit. parsedBarcode:", parsedBarcode);
 
                     try {
-                        // Get POS from env/service instead of `this`
-                        const currentPos = pos; // from service dependency
+                        // Get POS from multiple possible sources
+                        const currentPos = pos || (this && this.pos) || (env && env.services && env.services.pos);
                         const code = parsedBarcode && parsedBarcode.code;
                         console.log("[Magellan] product callback pos:", !!currentPos, "code:", code);
 
@@ -180,8 +200,8 @@ const magellanBarcodeReaderService = {
                         );
                     }
 
-                    // Fallback: normal behavior - preserve original context
-                    return originalProductCb.call(this, parsedBarcode);
+                    // Fallback: normal behavior - use captured context
+                    return originalProductCb.call(callbackContext || this, parsedBarcode);
                 };
 
                 cbMap.product = wrappedProductCb;
