@@ -26,8 +26,10 @@ async function startBarcodePolling() {
             const odooProxyUrl = `/labodega_pos/proxy/barcode?bridge_url=${encodeURIComponent(bridgeUrl)}`;
 
             pollCount++;
-            if (pollCount % 50 === 0) {
-                console.log(`[Magellan] Barcode poll #${pollCount} - fetching: ${odooProxyUrl}`);
+
+            // Log every 10 polls for debugging
+            if (pollCount % 10 === 0) {
+                console.log(`[Magellan] 🔄 Barcode poll #${pollCount} - fetching: ${odooProxyUrl}`);
             }
 
             const response = await fetch(odooProxyUrl, {
@@ -37,31 +39,49 @@ async function startBarcodePolling() {
                 },
             });
 
+            console.log(`[Magellan] 📡 Poll #${pollCount} - Response status: ${response.status} ${response.statusText}`);
+
             if (!response.ok) {
+                console.error(`[Magellan] ❌ Bad response: ${response.status}`);
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
 
-            // Debug: log every 50th response to see what we're getting
-            if (pollCount % 50 === 0) {
-                console.log(`[Magellan] Poll #${pollCount} response:`, data);
-            }
+            // Log EVERY response to see what we're getting
+            console.log(`[Magellan] 📦 Poll #${pollCount} response data:`, JSON.stringify(data));
 
             if (data && data.barcode) {
-                console.log("[Magellan] ✅ Got barcode via Odoo proxy:", data.barcode);
+                console.log("[Magellan] ✅✅✅ Got barcode via Odoo proxy:", data.barcode);
+                console.log("[Magellan] 🎯 window.magellanBarcodeReader exists?", !!window.magellanBarcodeReader);
+                console.log("[Magellan] 🎯 window.magellanBarcodeReader.scan exists?", typeof window.magellanBarcodeReader?.scan);
+
                 try {
-                    window.magellanBarcodeReader.scan(data.barcode);
+                    if (!window.magellanBarcodeReader) {
+                        console.error("[Magellan] ❌ window.magellanBarcodeReader is null/undefined!");
+                    } else if (typeof window.magellanBarcodeReader.scan !== 'function') {
+                        console.error("[Magellan] ❌ window.magellanBarcodeReader.scan is not a function!");
+                    } else {
+                        console.log("[Magellan] 🚀 Calling barcodeReader.scan with:", data.barcode);
+                        window.magellanBarcodeReader.scan(data.barcode);
+                        console.log("[Magellan] ✅ barcodeReader.scan called successfully");
+                    }
                 } catch (err) {
-                    console.error("[Magellan] Error calling barcodeReader.scan:", err);
+                    console.error("[Magellan] ❌ Error calling barcodeReader.scan:", err);
+                    console.error("[Magellan] ❌ Error stack:", err.stack);
                 }
             } else {
+                // Log null/empty responses occasionally
+                if (pollCount % 50 === 0) {
+                    console.log(`[Magellan] ⚪ Poll #${pollCount} - No barcode (empty response)`);
+                }
                 // no barcode → just loop again (poll every 200ms)
                 await new Promise((resolve) => setTimeout(resolve, 200));
             }
         } catch (err) {
             console.error("[Magellan] ❌ Odoo proxy error:", err.message);
-            console.error("[Magellan] Full error:", err);
+            console.error("[Magellan] ❌ Full error:", err);
+            console.error("[Magellan] ❌ Error stack:", err.stack);
             // backoff a bit on errors
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
@@ -111,23 +131,34 @@ const magellanBarcodeReaderService = {
                     // Capture the context on first call
                     if (!callbackContext) {
                         callbackContext = this;
+                        console.log("[Magellan] 🎯 Captured callback context:", !!callbackContext);
                     }
 
-                    console.log("[Magellan] product callback hit. parsedBarcode:", parsedBarcode);
+                    console.log("[Magellan] 🔔 PRODUCT CALLBACK HIT!");
+                    console.log("[Magellan] 📦 parsedBarcode:", JSON.stringify(parsedBarcode));
 
                     try {
                         // Get POS from multiple possible sources
                         const currentPos = pos || (this && this.pos) || (env && env.services && env.services.pos);
                         const code = parsedBarcode && parsedBarcode.code;
-                        console.log("[Magellan] product callback pos:", !!currentPos, "code:", code);
+                        console.log("[Magellan] 🏪 POS available?", !!currentPos, "| barcode code:", code);
+                        console.log("[Magellan] 🏪 POS.db available?", !!currentPos?.db);
 
                         if (currentPos && currentPos.db && code) {
+                            console.log("[Magellan] 🔍 Looking up product with barcode:", code);
                             const product = currentPos.db.get_product_by_barcode(code);
-                            console.log("[Magellan] product from POS DB:", product);
+                            console.log("[Magellan] 📦 Product found:", !!product);
+                            if (product) {
+                                console.log("[Magellan] 📦 Product details:", {
+                                    id: product.id,
+                                    name: product.display_name,
+                                    to_weight: product.to_weight
+                                });
+                            }
 
                             if (product && product.to_weight) {
                                 console.log(
-                                    "[Magellan] Detected weighted product:",
+                                    "[Magellan] ⚖️ WEIGHTED PRODUCT DETECTED:",
                                     product.display_name
                                 );
 
