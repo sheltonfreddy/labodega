@@ -1,7 +1,12 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { BRIDGE_CONFIG } from "./magellan_config";
+export const BRIDGE_CONFIG = {
+    BRIDGE_URL: "http://10.0.0.35:8000",
+    BARCODE_POLL_INTERVAL: 200,
+    ERROR_RETRY_DELAY: 2000,
+    CONNECTION_ERROR_DELAY: 3000,
+};import { BRIDGE_CONFIG } from "./magellan_config";
 
 console.log("[Magellan] magellan_scale_service.js loaded");
 
