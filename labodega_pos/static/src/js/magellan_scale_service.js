@@ -3,7 +3,25 @@
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
 
-console.log("[Magellan] magellan_scale_service.js loaded");
+console.log("[Magellan] magellan_scale_service.js loaded (multi-terminal support)");
+
+// Global reference to POS service for accessing session ID
+let posService = null;
+
+function getSessionId() {
+    /**
+     * Get the current POS session ID
+     * This allows us to route requests to the correct Raspberry Pi
+     */
+    try {
+        if (posService && posService.pos_session) {
+            return posService.pos_session.id;
+        }
+    } catch (e) {
+        console.warn("[Magellan] Could not get session ID:", e);
+    }
+    return null;
+}
 
 async function startBarcodePolling() {
     // wait until the barcodeReader service has been exposed
@@ -16,7 +34,10 @@ async function startBarcodePolling() {
 
     while (true) {
         try {
-            const data = await rpc("/pos/magellan/barcode");
+            const sessionId = getSessionId();
+            const data = await rpc("/pos/magellan/barcode", {
+                pos_session_id: sessionId
+            });
 
             if (data.error) {
                 console.warn("[Magellan] Bridge error:", data.error);
@@ -46,13 +67,17 @@ async function startBarcodePolling() {
 // Service wrapper to:
 // - patch barcode_reader for weighted products (call /weight via Odoo proxy)
 // - expose barcode_reader globally
+// - support multiple terminals with different Raspberry Pis
 const magellanBarcodeReaderService = {
-    dependencies: ["barcode_reader"],
-    start(env, { barcode_reader }) {
+    dependencies: ["barcode_reader", "pos"],
+    start(env, { barcode_reader, pos }) {
         console.log(
             "[Magellan] magellan_barcode_reader service start – got barcode_reader:",
             barcode_reader
         );
+
+        // Store POS service reference globally
+        posService = pos;
 
         const barcodeReader = barcode_reader;
 
@@ -97,7 +122,12 @@ const magellanBarcodeReaderService = {
 
                                 let weight = null;
                                 try {
-                                    const data = await rpc("/pos/magellan/weight");
+                                    // Get session ID to route to correct Pi
+                                    const sessionId = getSessionId();
+
+                                    const data = await rpc("/pos/magellan/weight", {
+                                        pos_session_id: sessionId
+                                    });
                                     console.log("[Magellan] /weight response:", data);
 
                                     if (data.error) {
@@ -171,3 +201,4 @@ registry.category("services").add(
     "magellan_barcode_reader",
     magellanBarcodeReaderService
 );
+

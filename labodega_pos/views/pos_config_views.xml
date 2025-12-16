@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_config_form_inherit_magellan" model="ir.ui.view">
+        <field name="name">pos.config.form.inherit.magellan</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='hardware']" position="after">
+                <group string="Magellan Scale/Scanner" name="magellan">
+                    <field name="magellan_bridge_url"
+                           placeholder="http://100.101.102.103:8000"
+                           widget="url"/>
+                    <div colspan="2" class="text-muted">
+                        <p>Enter the Tailscale IP address of the Raspberry Pi for this terminal.</p>
+                        <p>Example: http://100.101.102.103:8000</p>
+                        <p>Leave empty to use system-wide default.</p>
+                    </div>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
