@@ -47,6 +47,7 @@ class MagellanBridgeController(http.Controller):
             pos_session_id: ID of the POS session (determines which Pi to connect to)
         Returns: {"barcode": "123456789"} or {"barcode": null}
         """
+        bridge_url = None
         try:
             bridge_url = self._get_bridge_url(pos_session_id)
             _logger.debug(f"[Magellan] Barcode request to: {bridge_url}/barcode")
@@ -63,11 +64,11 @@ class MagellanBridgeController(http.Controller):
 
             return data
         except requests.exceptions.ConnectTimeout as e:
-            error_msg = f"Connection timeout to {bridge_url}"
+            error_msg = f"Connection timeout to {bridge_url or 'unknown'}"
             _logger.error(f"[Magellan] {error_msg}: {e}")
             return {"barcode": None, "error": error_msg}
         except requests.exceptions.ConnectionError as e:
-            error_msg = f"Connection refused to {bridge_url}"
+            error_msg = f"Connection refused to {bridge_url or 'unknown'}"
             _logger.error(f"[Magellan] {error_msg}: {e}")
             return {"barcode": None, "error": error_msg}
         except Exception as e:
@@ -82,6 +83,7 @@ class MagellanBridgeController(http.Controller):
             pos_session_id: ID of the POS session (determines which Pi to connect to)
         Returns: {"weight": 0.450, "raw": "S110045"} or {"weight": null, "error": "..."}
         """
+        bridge_url = None
         try:
             bridge_url = self._get_bridge_url(pos_session_id)
             _logger.debug(f"[Magellan] Weight request to: {bridge_url}/weight")
@@ -98,7 +100,7 @@ class MagellanBridgeController(http.Controller):
 
             return data
         except requests.exceptions.ConnectTimeout as e:
-            error_msg = f"Connection timeout to {bridge_url}"
+            error_msg = f"Connection timeout to {bridge_url or 'unknown'}"
             _logger.error(f"[Magellan] {error_msg}: {e}")
             return {"weight": None, "error": error_msg}
         except Exception as e:
@@ -111,6 +113,7 @@ class MagellanBridgeController(http.Controller):
         Check if the bridge is reachable
         Returns: {"status": "ok"} or {"status": "error", "error": "..."}
         """
+        bridge_url = None
         try:
             bridge_url = self._get_bridge_url(pos_session_id)
             _logger.info(f"[Magellan] Testing connection to: {bridge_url}")
@@ -134,6 +137,87 @@ class MagellanBridgeController(http.Controller):
             return {
                 "status": "error",
                 "error": str(e),
-                "bridge_url": bridge_url if 'bridge_url' in locals() else 'unknown'
+                "bridge_url": bridge_url or 'unknown'
             }
+
+    # HTTP GET routes for browser fetch() compatibility (avoids mixed content HTTPS→HTTP)
+
+    @http.route('/labodega_pos/proxy/barcode', type='http', auth='user', methods=['GET'], csrf=False)
+    def proxy_barcode_get(self, bridge_url=None, **kwargs):
+        """
+        HTTP GET proxy for barcode reading (browser fetch compatibility)
+        Args:
+            bridge_url: IP:port of the Raspberry Pi (e.g., "10.0.0.35:8000")
+        Returns: JSON {"barcode": "123456789"} or {"barcode": null}
+        """
+        try:
+            # Construct full bridge URL
+            if not bridge_url:
+                bridge_url = "10.0.0.35:8000"  # Default
+
+            if not bridge_url.startswith('http'):
+                bridge_url = f"http://{bridge_url}"
+
+            _logger.debug(f"[Magellan] Barcode proxy GET to: {bridge_url}/barcode")
+
+            response = requests.get(
+                f"{bridge_url}/barcode",
+                timeout=5
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get('barcode'):
+                _logger.info(f"[Magellan] Got barcode via proxy: {data.get('barcode')}")
+
+            return request.make_json_response(data)
+        except requests.exceptions.ConnectTimeout as e:
+            error_msg = f"Connection timeout to {bridge_url}"
+            _logger.error(f"[Magellan] {error_msg}: {e}")
+            return request.make_json_response({"barcode": None, "error": error_msg})
+        except requests.exceptions.ConnectionError as e:
+            error_msg = f"Connection refused to {bridge_url}"
+            _logger.error(f"[Magellan] {error_msg}: {e}")
+            return request.make_json_response({"barcode": None, "error": error_msg})
+        except Exception as e:
+            _logger.error(f"[Magellan] Error in proxy barcode GET: {e}")
+            return request.make_json_response({"barcode": None, "error": str(e)})
+
+    @http.route('/labodega_pos/proxy/weight', type='http', auth='user', methods=['GET'], csrf=False)
+    def proxy_weight_get(self, bridge_url=None, **kwargs):
+        """
+        HTTP GET proxy for weight reading (browser fetch compatibility)
+        Args:
+            bridge_url: IP:port of the Raspberry Pi (e.g., "10.0.0.35:8000")
+        Returns: JSON {"weight": 0.450, "raw": "S110045"} or {"weight": null}
+        """
+        try:
+            # Construct full bridge URL
+            if not bridge_url:
+                bridge_url = "10.0.0.35:8000"  # Default
+
+            if not bridge_url.startswith('http'):
+                bridge_url = f"http://{bridge_url}"
+
+            _logger.debug(f"[Magellan] Weight proxy GET to: {bridge_url}/weight")
+
+            response = requests.get(
+                f"{bridge_url}/weight",
+                timeout=5
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get('weight'):
+                _logger.info(f"[Magellan] Got weight via proxy: {data.get('weight')} kg")
+
+            return request.make_json_response(data)
+        except requests.exceptions.ConnectTimeout as e:
+            error_msg = f"Connection timeout to {bridge_url}"
+            _logger.error(f"[Magellan] {error_msg}: {e}")
+            return request.make_json_response({"weight": None, "error": error_msg})
+        except Exception as e:
+            _logger.error(f"[Magellan] Error in proxy weight GET: {e}")
+            return request.make_json_response({"weight": None, "error": str(e)})
+
 

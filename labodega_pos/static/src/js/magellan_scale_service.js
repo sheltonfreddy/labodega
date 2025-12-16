@@ -3,8 +3,9 @@
 import { registry } from "@web/core/registry";
 import { BRIDGE_CONFIG } from "./magellan_config";
 
-console.log("[Magellan] magellan_scale_service.js loaded (direct browser → Pi)");
+console.log("[Magellan] magellan_scale_service.js loaded (via Odoo proxy)");
 console.log("[Magellan] Pi bridge URL:", BRIDGE_CONFIG.BRIDGE_URL);
+console.log("[Magellan] Using Odoo proxy to avoid HTTPS→HTTP mixed content errors");
 
 async function startBarcodePolling() {
     // wait until the barcodeReader service has been exposed
@@ -13,19 +14,21 @@ async function startBarcodePolling() {
         await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL;
-    console.log("[Magellan] Starting DIRECT barcode polling from Pi:", bridgeUrl);
-    console.log("[Magellan] Browser → Pi communication (no Odoo proxy needed!)");
+    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL.replace('http://', '').replace('https://', '');
+    console.log("[Magellan] Starting barcode polling via Odoo proxy");
+    console.log("[Magellan] Pi bridge:", bridgeUrl);
+    console.log("[Magellan] Browser → Odoo (HTTPS) → Pi (HTTP) to avoid mixed content");
 
     while (true) {
         try {
-            // Direct fetch to Pi - no Odoo server involved!
-            const response = await fetch(`${bridgeUrl}/barcode`, {
+            // Use Odoo proxy to avoid mixed content HTTPS→HTTP issue
+            const odooProxyUrl = `/labodega_pos/proxy/barcode?bridge_url=${encodeURIComponent(bridgeUrl)}`;
+
+            const response = await fetch(odooProxyUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
                 },
-                mode: 'cors', // Allow cross-origin requests
             });
 
             if (!response.ok) {
@@ -35,7 +38,7 @@ async function startBarcodePolling() {
             const data = await response.json();
 
             if (data && data.barcode) {
-                console.log("[Magellan] Got barcode from bridge:", data.barcode);
+                console.log("[Magellan] Got barcode via Odoo proxy:", data.barcode);
                 try {
                     window.magellanBarcodeReader.scan(data.barcode);
                 } catch (err) {
@@ -46,7 +49,7 @@ async function startBarcodePolling() {
                 await new Promise((resolve) => setTimeout(resolve, 200));
             }
         } catch (err) {
-            console.error("[Magellan] Bridge connection error:", err.message);
+            console.error("[Magellan] Odoo proxy error:", err.message);
             // backoff a bit on errors
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
@@ -88,16 +91,18 @@ const magellanBarcodeReaderService = {
             if (cbMap && typeof cbMap.product === "function") {
                 const originalProductCb = cbMap.product;
 
-                cbMap.product = async function (parsedBarcode) {
+                // Use arrow function to preserve `this` context
+                const wrappedProductCb = async function (parsedBarcode) {
                     console.log("[Magellan] product callback hit. parsedBarcode:", parsedBarcode);
 
                     try {
-                        const pos = this.pos;
+                        // Get POS from env/service instead of `this`
+                        const currentPos = pos; // from service dependency
                         const code = parsedBarcode && parsedBarcode.code;
-                        console.log("[Magellan] product callback this.pos:", !!pos, "code:", code);
+                        console.log("[Magellan] product callback pos:", !!currentPos, "code:", code);
 
-                        if (pos && pos.db && code) {
-                            const product = pos.db.get_product_by_barcode(code);
+                        if (currentPos && currentPos.db && code) {
+                            const product = currentPos.db.get_product_by_barcode(code);
                             console.log("[Magellan] product from POS DB:", product);
 
                             if (product && product.to_weight) {
@@ -108,14 +113,16 @@ const magellanBarcodeReaderService = {
 
                                 let weight = null;
                                 try {
-                                    // Direct fetch to Pi for weight - no Odoo proxy needed!
-                                    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL;
-                                    const response = await fetch(`${bridgeUrl}/weight`, {
+                                    // Use Odoo proxy to avoid mixed content HTTPS→HTTP issue
+                                    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL.replace('http://', '').replace('https://', '');
+                                    const odooProxyUrl = `/labodega_pos/proxy/weight?bridge_url=${encodeURIComponent(bridgeUrl)}`;
+
+                                    console.log("[Magellan] Fetching weight via Odoo proxy:", odooProxyUrl);
+                                    const response = await fetch(odooProxyUrl, {
                                         method: 'GET',
                                         headers: {
                                             'Accept': 'application/json',
                                         },
-                                        mode: 'cors',
                                     });
 
                                     if (!response.ok) {
@@ -140,13 +147,13 @@ const magellanBarcodeReaderService = {
                                     }
                                 } catch (err) {
                                     console.error(
-                                        "[Magellan] Error calling /weight from Pi:",
+                                        "[Magellan] Error calling /weight via Odoo proxy:",
                                         err.message
                                     );
                                 }
 
                                 if (weight && weight > 0) {
-                                    const order = pos.get_order();
+                                    const order = currentPos.get_order();
                                     console.log("[Magellan] Current order:", order);
                                     if (order) {
                                         order.add_product(product, { quantity: weight });
@@ -173,9 +180,11 @@ const magellanBarcodeReaderService = {
                         );
                     }
 
-                    // Fallback: normal behavior
+                    // Fallback: normal behavior - preserve original context
                     return originalProductCb.call(this, parsedBarcode);
                 };
+
+                cbMap.product = wrappedProductCb;
             }
 
             return originalRegister(cbMap, exclusive);
