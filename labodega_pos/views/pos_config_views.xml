@@ -5,17 +5,27 @@
         <field name="model">pos.config</field>
         <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//group[@name='hardware']" position="after">
-                <group string="Magellan Scale/Scanner" name="magellan">
-                    <field name="magellan_bridge_url"
-                           placeholder="http://100.101.102.103:8000"
-                           widget="url"/>
-                    <div colspan="2" class="text-muted">
-                        <p>Enter the Tailscale IP address of the Raspberry Pi for this terminal.</p>
-                        <p>Example: http://100.101.102.103:8000</p>
-                        <p>Leave empty to use system-wide default.</p>
+            <xpath expr="//setting[@id='other_devices']" position="after">
+                <setting id="magellan_scanner" string="Magellan Scale/Scanner"
+                         help="Configure Raspberry Pi bridge for Magellan scale and barcode scanner">
+                    <div class="content-group">
+                        <div class="row mt-2">
+                            <label for="magellan_bridge_url" class="col-lg-4 o_light_label"/>
+                            <field name="magellan_bridge_url"
+                                   class="col-lg-8"
+                                   placeholder="http://100.101.102.103:8000"/>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12 text-muted">
+                                <small>
+                                    <i class="fa fa-info-circle"/> Enter the Tailscale IP of the Raspberry Pi bridge for this terminal.<br/>
+                                    Example: http://100.101.102.103:8000<br/>
+                                    Leave empty to use system-wide default.
+                                </small>
+                            </div>
+                        </div>
                     </div>
-                </group>
+                </setting>
             </xpath>
         </field>
     </record>
