@@ -1,27 +1,10 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { rpc } from "@web/core/network/rpc";
+import { BRIDGE_CONFIG } from "./magellan_config";
 
-console.log("[Magellan] magellan_scale_service.js loaded (multi-terminal support)");
-
-// Global reference to POS service for accessing session ID
-let posService = null;
-
-function getSessionId() {
-    /**
-     * Get the current POS session ID
-     * This allows us to route requests to the correct Raspberry Pi
-     */
-    try {
-        if (posService && posService.pos_session) {
-            return posService.pos_session.id;
-        }
-    } catch (e) {
-        console.warn("[Magellan] Could not get session ID:", e);
-    }
-    return null;
-}
+console.log("[Magellan] magellan_scale_service.js loaded (direct browser → Pi)");
+console.log("[Magellan] Pi bridge URL:", BRIDGE_CONFIG.BRIDGE_URL);
 
 async function startBarcodePolling() {
     // wait until the barcodeReader service has been exposed
@@ -30,22 +13,28 @@ async function startBarcodePolling() {
         await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    console.log("[Magellan] Starting barcode polling from bridge via Odoo proxy");
+    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL;
+    console.log("[Magellan] Starting DIRECT barcode polling from Pi:", bridgeUrl);
+    console.log("[Magellan] Browser → Pi communication (no Odoo proxy needed!)");
 
     while (true) {
         try {
-            const sessionId = getSessionId();
-            const data = await rpc("/pos/magellan/barcode", {
-                pos_session_id: sessionId
+            // Direct fetch to Pi - no Odoo server involved!
+            const response = await fetch(`${bridgeUrl}/barcode`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                mode: 'cors', // Allow cross-origin requests
             });
 
-            if (data.error) {
-                console.warn("[Magellan] Bridge error:", data.error);
-                await new Promise((resolve) => setTimeout(resolve, 3000));
-                continue;
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            if (data.barcode) {
+            const data = await response.json();
+
+            if (data && data.barcode) {
                 console.log("[Magellan] Got barcode from bridge:", data.barcode);
                 try {
                     window.magellanBarcodeReader.scan(data.barcode);
@@ -57,7 +46,7 @@ async function startBarcodePolling() {
                 await new Promise((resolve) => setTimeout(resolve, 200));
             }
         } catch (err) {
-            console.error("[Magellan] Error while polling /barcode:", err);
+            console.error("[Magellan] Bridge connection error:", err.message);
             // backoff a bit on errors
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
@@ -75,9 +64,6 @@ const magellanBarcodeReaderService = {
             "[Magellan] magellan_barcode_reader service start – got barcode_reader:",
             barcode_reader
         );
-
-        // Store POS service reference globally
-        posService = pos;
 
         const barcodeReader = barcode_reader;
 
@@ -122,17 +108,24 @@ const magellanBarcodeReaderService = {
 
                                 let weight = null;
                                 try {
-                                    // Get session ID to route to correct Pi
-                                    const sessionId = getSessionId();
-
-                                    const data = await rpc("/pos/magellan/weight", {
-                                        pos_session_id: sessionId
+                                    // Direct fetch to Pi for weight - no Odoo proxy needed!
+                                    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL;
+                                    const response = await fetch(`${bridgeUrl}/weight`, {
+                                        method: 'GET',
+                                        headers: {
+                                            'Accept': 'application/json',
+                                        },
+                                        mode: 'cors',
                                     });
+
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                    }
+
+                                    const data = await response.json();
                                     console.log("[Magellan] /weight response:", data);
 
-                                    if (data.error) {
-                                        console.warn("[Magellan] Bridge /weight error:", data.error);
-                                    } else if (
+                                    if (
                                         data &&
                                         typeof data.weight === "number" &&
                                         data.weight !== null &&
@@ -147,8 +140,8 @@ const magellanBarcodeReaderService = {
                                     }
                                 } catch (err) {
                                     console.error(
-                                        "[Magellan] Error calling /weight bridge:",
-                                        err
+                                        "[Magellan] Error calling /weight from Pi:",
+                                        err.message
                                     );
                                 }
 

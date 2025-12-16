@@ -31,9 +31,10 @@ class MagellanBridgeController(http.Controller):
                 _logger.warning(f"[Magellan] Could not get bridge URL from session {pos_session_id}: {e}")
 
         # Fallback to system-wide parameter
+        # Default changed to Tailscale IP - change this to your Pi's Tailscale IP
         bridge_url = request.env['ir.config_parameter'].sudo().get_param(
             'labodega_pos.bridge_url',
-            'http://10.0.0.35:8000'
+            'http://100.69.187.119:8000'  # Tailscale IP of Raspberry Pi
         )
         _logger.info(f"[Magellan] Using system-wide bridge URL: {bridge_url}")
         return bridge_url
