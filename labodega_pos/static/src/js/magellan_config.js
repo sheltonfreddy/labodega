@@ -7,14 +7,10 @@
  */
 
 export const BRIDGE_CONFIG = {
-    // Bridge server URL - IMPORTANT: Use your Pi's LOCAL LAN IP!
-    // Browser talks DIRECTLY to Pi (no Odoo proxy needed)
+    // Bridge server URL - Browser talks DIRECTLY to Pi (no Odoo proxy, no Tailscale)
+    // LAN IP: "http://10.0.0.35:8000" - Direct connection on same local network
     //
-    // For development/testing: "http://127.0.0.1:8000"
-    // For production: "http://192.168.1.100:8000" (replace with your Pi's actual LAN IP)
-    //
-    // To find Pi's IP: On Pi, run: hostname -I
-    // Example: "http://10.0.0.35:8000" ← Your Pi's current IP
+    // ✅ DIRECT LAN CONNECTION (no Tailscale needed)
     BRIDGE_URL: "http://10.0.0.35:8000",
 
     // Polling interval in milliseconds

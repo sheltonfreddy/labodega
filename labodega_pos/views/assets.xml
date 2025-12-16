@@ -1,9 +1,13 @@
 <odoo>
     <data>
         <!-- Adjust inherit_id if Odoo 18 renamed the bundle;
-             in 16/17 it’s point_of_sale._assets_pos -->
+             in 16/17 it's point_of_sale._assets_pos -->
         <template id="assets_pos_magellan" inherit_id="point_of_sale._assets_pos">
             <xpath expr="." position="inside">
+                <!-- Load config FIRST (it's a dependency) -->
+                <script type="text/javascript"
+                        src="/labodega_pos/static/src/js/magellan_config.js"/>
+                <!-- Then load the scale/barcode service that imports config -->
                 <script type="text/javascript"
                         src="/labodega_pos/static/src/js/magellan_scale_service.js"/>
             </xpath>
