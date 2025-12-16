@@ -1,40 +1,29 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-
-export const BRIDGE_CONFIG = {
-    BRIDGE_URL: "http://10.0.0.35:8000",
-    BARCODE_POLL_INTERVAL: 200,
-    ERROR_RETRY_DELAY: 2000,
-    CONNECTION_ERROR_DELAY: 3000,
-};
+import { jsonrpc } from "@web/core/network/rpc_service";
 
 console.log("[Magellan] magellan_scale_service.js loaded");
 
-async function startBarcodePolling() {
+async function startBarcodePolling(rpc) {
     // wait until the barcodeReader service has been exposed
     while (!window.magellanBarcodeReader) {
         console.log("[Magellan] Waiting for magellanBarcodeReader...");
         await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    console.log("[Magellan] Starting barcode polling from bridge");
+    console.log("[Magellan] Starting barcode polling from bridge via Odoo proxy");
 
     while (true) {
         try {
-            const response = await fetch(`${BRIDGE_CONFIG.BRIDGE_URL}/barcode`, {
-                method: "GET",
-                headers: { Accept: "application/json" },
-                cache: "no-cache",
-            });
+            const data = await rpc("/pos/magellan/barcode");
 
-            if (!response.ok) {
-                console.warn("[Magellan] /barcode HTTP error:", response.status);
-                await new Promise((resolve) => setTimeout(resolve, BRIDGE_CONFIG.CONNECTION_ERROR_DELAY));
+            if (data.error) {
+                console.warn("[Magellan] Bridge error:", data.error);
+                await new Promise((resolve) => setTimeout(resolve, 3000));
                 continue;
             }
 
-            const data = await response.json();
             if (data.barcode) {
                 console.log("[Magellan] Got barcode from bridge:", data.barcode);
                 try {
@@ -44,22 +33,22 @@ async function startBarcodePolling() {
                 }
             } else {
                 // no barcode → just loop again (poll every 200ms)
-                await new Promise((resolve) => setTimeout(resolve, BRIDGE_CONFIG.BARCODE_POLL_INTERVAL));
+                await new Promise((resolve) => setTimeout(resolve, 200));
             }
         } catch (err) {
             console.error("[Magellan] Error while polling /barcode:", err);
             // backoff a bit on errors
-            await new Promise((resolve) => setTimeout(resolve, BRIDGE_CONFIG.ERROR_RETRY_DELAY));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
         }
     }
 }
 
 // Service wrapper to:
-// - patch barcode_reader for weighted products (call /weight)
+// - patch barcode_reader for weighted products (call /weight via Odoo proxy)
 // - expose barcode_reader globally
 const magellanBarcodeReaderService = {
-    dependencies: ["barcode_reader"],
-    start(env, { barcode_reader }) {
+    dependencies: ["barcode_reader", "rpc"],
+    start(env, { barcode_reader, rpc }) {
         console.log(
             "[Magellan] magellan_barcode_reader service start – got barcode_reader:",
             barcode_reader
@@ -108,44 +97,23 @@ const magellanBarcodeReaderService = {
 
                                 let weight = null;
                                 try {
-                                    const response = await fetch(
-                                        `${BRIDGE_CONFIG.BRIDGE_URL}/weight`,
-                                        {
-                                            method: "GET",
-                                            headers: { Accept: "application/json" },
-                                            cache: "no-cache",
-                                        }
-                                    );
-                                    console.log(
-                                        "[Magellan] /weight HTTP status:",
-                                        response.status
-                                    );
+                                    const data = await rpc("/pos/magellan/weight");
+                                    console.log("[Magellan] /weight response:", data);
 
-                                    if (!response.ok) {
-                                        console.warn(
-                                            "[Magellan] Bridge /weight HTTP error:",
-                                            response.status
-                                        );
+                                    if (data.error) {
+                                        console.warn("[Magellan] Bridge /weight error:", data.error);
+                                    } else if (
+                                        data &&
+                                        typeof data.weight === "number" &&
+                                        data.weight !== null &&
+                                        data.weight > 0
+                                    ) {
+                                        weight = data.weight;
                                     } else {
-                                        const data = await response.json();
-                                        console.log("[Magellan] /weight JSON response:", data);
-
-                                        if (
-                                            data &&
-                                            typeof data.weight === "number" &&
-                                            data.weight !== null &&
-                                            data.weight > 0
-                                        ) {
-                                            weight = data.weight;
-                                        } else {
-                                            console.warn(
-                                                "[Magellan] /weight returned invalid weight:",
-                                                data
-                                            );
-                                            if (data.error) {
-                                                console.error("[Magellan] Bridge error:", data.error);
-                                            }
-                                        }
+                                        console.warn(
+                                            "[Magellan] /weight returned invalid weight:",
+                                            data
+                                        );
                                     }
                                 } catch (err) {
                                     console.error(
@@ -191,7 +159,7 @@ const magellanBarcodeReaderService = {
         };
 
         // kick off barcode polling loop (once)
-        startBarcodePolling().catch((err) => {
+        startBarcodePolling(rpc).catch((err) => {
             console.error("[Magellan] Error starting polling:", err);
         });
 

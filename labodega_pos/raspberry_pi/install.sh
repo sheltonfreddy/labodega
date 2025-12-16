@@ -1,103 +1,100 @@
 #!/bin/bash
-#
-# Installation script for Magellan Scale Scanner Bridge on Raspberry Pi
-# Run with: bash install.sh
-#
+# Quick setup script for Magellan Scale Scanner Bridge
 
-set -e  # Exit on any error
-
-echo "=========================================="
-echo "Magellan Scale Scanner Bridge Installer"
-echo "=========================================="
+echo "================================================"
+echo "Magellan Scale Scanner Bridge - Quick Setup"
+echo "================================================"
 echo ""
 
-# Check if running on Raspberry Pi / Linux
-if [[ ! -f /etc/os-release ]]; then
-    echo "ERROR: This script is designed for Linux/Raspberry Pi"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check if running on Raspberry Pi
+if [ -f /proc/device-tree/model ]; then
+    MODEL=$(cat /proc/device-tree/model)
+    echo -e "${GREEN}Detected: $MODEL${NC}"
+else
+    echo -e "${YELLOW}Warning: Not running on Raspberry Pi?${NC}"
+fi
+
+echo ""
+echo "Step 1: Installing system dependencies..."
+sudo apt-get update
+sudo apt-get install -y python3-pip python3-serial
+
+echo ""
+echo "Step 2: Installing Python packages..."
+pip3 install fastapi uvicorn pyserial requests
+
+echo ""
+echo "Step 3: Adding user to dialout group..."
+sudo usermod -a -G dialout $USER
+
+echo ""
+echo "Step 4: Detecting serial ports..."
+echo -e "${YELLOW}Available serial ports:${NC}"
+ls -la /dev/tty* | grep -E "ttyUSB|ttyACM|ttyS" || echo "No serial devices found"
+
+echo ""
+echo "Step 5: Checking if scale_bridge.py exists..."
+if [ -f "scale_bridge.py" ]; then
+    echo -e "${GREEN}✓ scale_bridge.py found${NC}"
+else
+    echo -e "${RED}✗ scale_bridge.py not found in current directory${NC}"
+    echo "Please copy scale_bridge.py to this directory first."
     exit 1
 fi
 
-# Install Python dependencies
-echo "[1/4] Installing Python dependencies..."
-pip3 install fastapi uvicorn pyserial --user
-
-# Check serial port
 echo ""
-echo "[2/4] Checking for serial ports..."
-if ls /dev/ttyUSB* 1> /dev/null 2>&1; then
-    echo "Found USB serial port(s):"
-    ls -la /dev/ttyUSB*
-    DETECTED_PORT=$(ls /dev/ttyUSB* | head -n1)
-    echo ""
-    echo "Detected port: $DETECTED_PORT"
-    echo "Make sure to update SERIAL_PORT in scale_bridge.py if this is wrong"
-else
-    echo "WARNING: No /dev/ttyUSB* ports found"
-    echo "Make sure your scanner is connected and drivers are installed"
-fi
-
-# Add user to dialout group (for serial port access)
-echo ""
-echo "[3/4] Adding user to dialout group for serial port access..."
-sudo usermod -a -G dialout $USER
-echo "✓ User added to dialout group"
-echo "NOTE: You may need to logout/login or reboot for this to take effect"
-
-# Create systemd service
-echo ""
-echo "[4/4] Creating systemd service..."
-
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-SCRIPT_PATH="$SCRIPT_DIR/scale_bridge.py"
-
-sudo tee /etc/systemd/system/scale-bridge.service > /dev/null <<EOF
+echo "Step 6: Creating systemd service..."
+sudo bash -c 'cat > /etc/systemd/system/magellan-bridge.service << EOL
 [Unit]
-Description=Magellan Scale Scanner Bridge for Odoo POS
+Description=Magellan Scale Scanner Bridge
 After=network.target
 
 [Service]
 Type=simple
-User=$USER
-WorkingDirectory=$SCRIPT_DIR
-ExecStart=/usr/bin/python3 $SCRIPT_PATH
+User='$USER'
+WorkingDirectory='$(pwd)'
+ExecStart=/usr/bin/python3 '$(pwd)'/scale_bridge.py
 Restart=always
-RestartSec=3
-StandardOutput=journal
-StandardError=journal
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-EOF
+EOL'
 
-sudo systemctl daemon-reload
-
-echo "✓ Systemd service created"
 echo ""
-echo "=========================================="
-echo "Installation Complete!"
-echo "=========================================="
+echo "Step 7: Enabling and starting service..."
+sudo systemctl daemon-reload
+sudo systemctl enable magellan-bridge
+sudo systemctl start magellan-bridge
+
+echo ""
+echo "Step 8: Checking service status..."
+sudo systemctl status magellan-bridge --no-pager
+
+echo ""
+echo "================================================"
+echo -e "${GREEN}Setup Complete!${NC}"
+echo "================================================"
 echo ""
 echo "Next steps:"
-echo ""
-echo "1. Edit configuration in scale_bridge.py:"
-echo "   nano $SCRIPT_PATH"
-echo ""
-echo "2. Test the bridge manually:"
-echo "   python3 $SCRIPT_PATH"
-echo ""
-echo "3. Once working, enable as a service:"
-echo "   sudo systemctl enable scale-bridge"
-echo "   sudo systemctl start scale-bridge"
-echo ""
-echo "4. Check service status:"
-echo "   sudo systemctl status scale-bridge"
-echo ""
-echo "5. View logs:"
-echo "   sudo journalctl -u scale-bridge -f"
-echo ""
-echo "6. Test the API:"
+echo "1. Logout and login again (or reboot) for dialout group to take effect"
+echo "2. Edit scale_bridge.py to configure SERIAL_PORT, BAUDRATE, etc."
+echo "3. Restart the service: sudo systemctl restart magellan-bridge"
+echo "4. Test endpoints:"
 echo "   curl http://localhost:8000/"
 echo "   curl http://localhost:8000/barcode"
 echo "   curl http://localhost:8000/weight"
+echo ""
+echo "View logs:"
+echo "   journalctl -u magellan-bridge -f"
+echo ""
+echo "To find your IP address:"
+echo "   hostname -I"
 echo ""
 

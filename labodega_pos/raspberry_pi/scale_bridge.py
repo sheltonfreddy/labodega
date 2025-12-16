@@ -39,9 +39,16 @@ app = FastAPI(
 # Enable CORS for browser access from Odoo
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # In production, restrict to your Odoo domain
-    allow_methods=["GET"],
+    allow_origins=[
+        "https://erp.labodegacalhoun.com",
+        "http://localhost:8069",
+        "http://127.0.0.1:8069",
+        "*"  # Allow all origins (remove in production if needed)
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Separate locks: one for serial hardware, one for shared barcode state
