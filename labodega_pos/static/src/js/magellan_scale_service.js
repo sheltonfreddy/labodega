@@ -1,11 +1,11 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { jsonrpc } from "@web/core/network/rpc_service";
+import { rpc } from "@web/core/network/rpc";
 
 console.log("[Magellan] magellan_scale_service.js loaded");
 
-async function startBarcodePolling(rpc) {
+async function startBarcodePolling() {
     // wait until the barcodeReader service has been exposed
     while (!window.magellanBarcodeReader) {
         console.log("[Magellan] Waiting for magellanBarcodeReader...");
@@ -47,8 +47,8 @@ async function startBarcodePolling(rpc) {
 // - patch barcode_reader for weighted products (call /weight via Odoo proxy)
 // - expose barcode_reader globally
 const magellanBarcodeReaderService = {
-    dependencies: ["barcode_reader", "rpc"],
-    start(env, { barcode_reader, rpc }) {
+    dependencies: ["barcode_reader"],
+    start(env, { barcode_reader }) {
         console.log(
             "[Magellan] magellan_barcode_reader service start – got barcode_reader:",
             barcode_reader
@@ -159,7 +159,7 @@ const magellanBarcodeReaderService = {
         };
 
         // kick off barcode polling loop (once)
-        startBarcodePolling(rpc).catch((err) => {
+        startBarcodePolling().catch((err) => {
             console.error("[Magellan] Error starting polling:", err);
         });
 
