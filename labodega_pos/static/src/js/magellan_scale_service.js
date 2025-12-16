@@ -168,7 +168,7 @@ const magellanBarcodeReaderService = {
                                     const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL.replace('http://', '').replace('https://', '');
                                     const odooProxyUrl = `/labodega_pos/proxy/weight?bridge_url=${encodeURIComponent(bridgeUrl)}`;
 
-                                    console.log("[Magellan] Fetching weight via Odoo proxy:", odooProxyUrl);
+                                    console.log("[Magellan] 🌐 Fetching weight via Odoo proxy:", odooProxyUrl);
                                     const response = await fetch(odooProxyUrl, {
                                         method: 'GET',
                                         headers: {
@@ -176,12 +176,14 @@ const magellanBarcodeReaderService = {
                                         },
                                     });
 
+                                    console.log("[Magellan] ⚖️ Weight response status:", response.status);
+
                                     if (!response.ok) {
                                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                                     }
 
                                     const data = await response.json();
-                                    console.log("[Magellan] /weight response:", data);
+                                    console.log("[Magellan] ⚖️ Weight response data:", JSON.stringify(data));
 
                                     if (
                                         data &&
@@ -190,48 +192,59 @@ const magellanBarcodeReaderService = {
                                         data.weight > 0
                                     ) {
                                         weight = data.weight;
+                                        console.log("[Magellan] ✅ Valid weight received:", weight);
                                     } else {
                                         console.warn(
-                                            "[Magellan] /weight returned invalid weight:",
+                                            "[Magellan] ⚠️ /weight returned invalid weight:",
                                             data
                                         );
                                     }
                                 } catch (err) {
                                     console.error(
-                                        "[Magellan] Error calling /weight via Odoo proxy:",
+                                        "[Magellan] ❌ Error calling /weight via Odoo proxy:",
                                         err.message
                                     );
+                                    console.error("[Magellan] ❌ Error stack:", err.stack);
                                 }
 
                                 if (weight && weight > 0) {
                                     const order = currentPos.get_order();
-                                    console.log("[Magellan] Current order:", order);
+                                    console.log("[Magellan] 🛒 Current order:", !!order);
                                     if (order) {
+                                        console.log("[Magellan] ➕ Adding weighted product to order:", product.display_name, "qty:", weight);
                                         order.add_product(product, { quantity: weight });
                                         console.log(
-                                            "[Magellan] Added weighted product",
+                                            "[Magellan] ✅ Successfully added weighted product",
                                             product.display_name,
                                             "qty =",
                                             weight
                                         );
                                         // Do NOT call originalProductCb to avoid extra qty=1
                                         return;
+                                    } else {
+                                        console.error("[Magellan] ❌ No current order!");
                                     }
                                 } else {
                                     console.warn(
-                                        "[Magellan] No valid weight, falling back to default handler"
+                                        "[Magellan] ⚠️ No valid weight, falling back to default handler"
                                     );
                                 }
                             }
+                        } else {
+                            console.log("[Magellan] ⚪ Skipping: missing POS/DB or barcode code");
+                            console.log("[Magellan] ⚪ currentPos:", !!currentPos, "db:", !!currentPos?.db, "code:", code);
                         }
                     } catch (err) {
                         console.error(
-                            "[Magellan] Error in wrapped product callback:",
+                            "[Magellan] ❌ Error in wrapped product callback:",
                             err
                         );
+                        console.error("[Magellan] ❌ Error message:", err.message);
+                        console.error("[Magellan] ❌ Error stack:", err.stack);
                     }
 
                     // Fallback: normal behavior - use captured context
+                    console.log("[Magellan] 🔄 Calling original product callback (fallback)");
                     return originalProductCb.call(callbackContext || this, parsedBarcode);
                 };
 
