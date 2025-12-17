@@ -275,12 +275,16 @@ if __name__ == "__main__":
     print()
 
     if use_https:
+        import ssl
         uvicorn.run(
             app,
             host=SERVER_HOST,
             port=SERVER_PORT,
             ssl_keyfile=ssl_keyfile,
-            ssl_certfile=ssl_certfile
+            ssl_certfile=ssl_certfile,
+            ssl_version=ssl.PROTOCOL_TLS_SERVER,
+            ssl_cert_reqs=ssl.CERT_NONE,
+            ssl_ca_certs=None
         )
     else:
         uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT)
