@@ -225,13 +225,30 @@ def get_weight():
 
 
 if __name__ == "__main__":
+    import os
+
+    # Check for SSL certificates
+    ssl_keyfile = os.path.expanduser("~/magellan_bridge/certs/key.pem")
+    ssl_certfile = os.path.expanduser("~/magellan_bridge/certs/cert.pem")
+    use_https = os.path.exists(ssl_keyfile) and os.path.exists(ssl_certfile)
+
+    protocol = "https" if use_https else "http"
+
     print("=" * 60)
     print("Magellan Scale Scanner Bridge")
     print("=" * 60)
     print(f"Serial Port: {SERIAL_PORT}")
     print(f"Baudrate: {BAUDRATE}")
     print(f"Weight Divisor: {WEIGHT_DIVISOR}")
-    print(f"HTTP Server: http://{SERVER_HOST}:{SERVER_PORT}")
+    print(f"HTTP Server: {protocol}://{SERVER_HOST}:{SERVER_PORT}")
+    if use_https:
+        print("🔒 HTTPS enabled (certificates found)")
+    else:
+        print("⚠️  HTTP only (no certificates found)")
+        print("   Run: openssl req -x509 -newkey rsa:4096 -nodes \\")
+        print(f"        -keyout {ssl_keyfile} \\")
+        print(f"        -out {ssl_certfile} \\")
+        print("        -days 3650 -subj \"/CN=$(hostname -I | awk '{print $1}')\"")
     print("=" * 60)
     print()
 
@@ -253,9 +270,18 @@ if __name__ == "__main__":
     # Start HTTP server
     print()
     print("Bridge is running!")
-    print(f"Test with: curl http://localhost:{SERVER_PORT}/barcode")
-    print(f"           curl http://localhost:{SERVER_PORT}/weight")
+    print(f"Test with: curl {'-k ' if use_https else ''}{protocol}://localhost:{SERVER_PORT}/barcode")
+    print(f"           curl {'-k ' if use_https else ''}{protocol}://localhost:{SERVER_PORT}/weight")
     print()
 
-    uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT)
+    if use_https:
+        uvicorn.run(
+            app,
+            host=SERVER_HOST,
+            port=SERVER_PORT,
+            ssl_keyfile=ssl_keyfile,
+            ssl_certfile=ssl_certfile
+        )
+    else:
+        uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT)
 
