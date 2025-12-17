@@ -99,6 +99,38 @@ def parse_s11_response(frame: bytes):
         return None
 
 
+def clean_magellan_barcode(barcode: str) -> str:
+    """
+    Clean Magellan scanner barcode prefixes/suffixes
+
+    Magellan scanners often prepend codes like:
+    - S08A + barcode (most common)
+    - S08 + barcode
+    - Other symbology identifiers
+
+    This strips known prefixes and returns the actual barcode.
+    """
+    if not barcode:
+        return barcode
+
+    # List of known Magellan prefixes to strip
+    prefixes = [
+        'S08A',  # Common Magellan prefix
+        'S08',   # Alternate prefix
+        'S09',   # Another variant
+        'S0A',   # Short variant
+    ]
+
+    for prefix in prefixes:
+        if barcode.startswith(prefix):
+            cleaned = barcode[len(prefix):]
+            print(f"[BARCODE] Cleaned: {barcode} → {cleaned} (removed prefix: {prefix})")
+            return cleaned
+
+    # No prefix found, return as-is
+    return barcode
+
+
 def barcode_reader_loop():
     """
     Continuously read from serial port.
@@ -137,9 +169,11 @@ def barcode_reader_loop():
                 # This is a barcode
                 text = line.decode("ascii", errors="ignore").strip()
                 if text:
-                    print(f"[BARCODE] Scanned: {text}")
+                    # Clean Magellan prefixes (like S08A)
+                    cleaned_barcode = clean_magellan_barcode(text)
+                    print(f"[BARCODE] Scanned: {text} → Clean: {cleaned_barcode}")
                     with barcode_lock:
-                        _last_barcode = text
+                        _last_barcode = cleaned_barcode
 
         except Exception as e:
             print(f"[ERROR] Barcode reader error: {e}")
