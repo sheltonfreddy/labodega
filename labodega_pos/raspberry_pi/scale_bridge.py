@@ -230,7 +230,11 @@ if __name__ == "__main__":
     # Check for SSL certificates
     ssl_keyfile = os.path.expanduser("~/magellan_bridge/certs/key.pem")
     ssl_certfile = os.path.expanduser("~/magellan_bridge/certs/cert.pem")
-    use_https = os.path.exists(ssl_keyfile) and os.path.exists(ssl_certfile)
+
+    # Check if certificates exist
+    key_exists = os.path.exists(ssl_keyfile)
+    cert_exists = os.path.exists(ssl_certfile)
+    use_https = key_exists and cert_exists
 
     protocol = "https" if use_https else "http"
 
@@ -241,14 +245,25 @@ if __name__ == "__main__":
     print(f"Baudrate: {BAUDRATE}")
     print(f"Weight Divisor: {WEIGHT_DIVISOR}")
     print(f"HTTP Server: {protocol}://{SERVER_HOST}:{SERVER_PORT}")
+    print()
+    print("SSL Certificate Check:")
+    print(f"  Key file:  {ssl_keyfile}")
+    print(f"    Exists: {'✓ YES' if key_exists else '✗ NO'}")
+    print(f"  Cert file: {ssl_certfile}")
+    print(f"    Exists: {'✓ YES' if cert_exists else '✗ NO'}")
+    print()
     if use_https:
-        print("🔒 HTTPS enabled (certificates found)")
+        print("🔒 HTTPS ENABLED (certificates found)")
     else:
-        print("⚠️  HTTP only (no certificates found)")
-        print("   Run: openssl req -x509 -newkey rsa:4096 -nodes \\")
-        print(f"        -keyout {ssl_keyfile} \\")
-        print(f"        -out {ssl_certfile} \\")
-        print("        -days 3650 -subj \"/CN=$(hostname -I | awk '{print $1}')\"")
+        print("⚠️  HTTP ONLY (no certificates found)")
+        print()
+        print("To enable HTTPS, generate certificates:")
+        print("  mkdir -p ~/magellan_bridge/certs")
+        print("  cd ~/magellan_bridge/certs")
+        print("  openssl req -x509 -newkey rsa:2048 -nodes \\")
+        print("    -keyout key.pem -out cert.pem -days 3650 \\")
+        print("    -subj \"/CN=$(hostname -I | awk '{print $1}')\" \\")
+        print("    -addext \"subjectAltName=IP:$(hostname -I | awk '{print $1}')\"")
     print("=" * 60)
     print()
 
