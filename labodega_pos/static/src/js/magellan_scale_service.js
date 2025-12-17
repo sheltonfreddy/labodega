@@ -3,9 +3,9 @@
 import { registry } from "@web/core/registry";
 import { BRIDGE_CONFIG } from "./magellan_config";
 
-console.log("[Magellan] magellan_scale_service.js loaded (via Odoo proxy)");
+console.log("[Magellan] magellan_scale_service.js loaded (DIRECT browser → Pi)");
 console.log("[Magellan] Pi bridge URL:", BRIDGE_CONFIG.BRIDGE_URL);
-console.log("[Magellan] Using Odoo proxy to avoid HTTPS→HTTP mixed content errors");
+console.log("[Magellan] Direct LAN communication (browser → Pi) - NO TAILSCALE");
 
 async function startBarcodePolling() {
     // wait until the barcodeReader service has been exposed
@@ -14,25 +14,24 @@ async function startBarcodePolling() {
         await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL.replace('http://', '').replace('https://', '');
-    console.log("[Magellan] Starting barcode polling via Odoo proxy");
-    console.log("[Magellan] Pi bridge:", bridgeUrl);
-    console.log("[Magellan] Browser → Odoo (HTTPS) → Pi (HTTP) to avoid mixed content");
+    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL;
+    console.log("[Magellan] Starting DIRECT barcode polling from Pi:", bridgeUrl);
+    console.log("[Magellan] Browser → Pi (same LAN) - no proxy needed!");
 
     let pollCount = 0;
     while (true) {
         try {
-            // Use Odoo proxy to avoid mixed content HTTPS→HTTP issue
-            const odooProxyUrl = `/labodega_pos/proxy/barcode?bridge_url=${encodeURIComponent(bridgeUrl)}`;
+            // Direct fetch to Pi (browser and Pi on same LAN)
+            const piUrl = `${bridgeUrl}/barcode`;
 
             pollCount++;
 
             // Log every 10 polls for debugging
             if (pollCount % 10 === 0) {
-                console.log(`[Magellan] 🔄 Barcode poll #${pollCount} - fetching: ${odooProxyUrl}`);
+                console.log(`[Magellan] 🔄 Barcode poll #${pollCount} - direct fetch: ${piUrl}`);
             }
 
-            const response = await fetch(odooProxyUrl, {
+            const response = await fetch(piUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -52,7 +51,7 @@ async function startBarcodePolling() {
             console.log(`[Magellan] 📦 Poll #${pollCount} response data:`, JSON.stringify(data));
 
             if (data && data.barcode) {
-                console.log("[Magellan] ✅✅✅ Got barcode via Odoo proxy:", data.barcode);
+                console.log("[Magellan] ✅✅✅ Got barcode directly from Pi:", data.barcode);
                 console.log("[Magellan] 🎯 window.magellanBarcodeReader exists?", !!window.magellanBarcodeReader);
                 console.log("[Magellan] 🎯 window.magellanBarcodeReader.scan exists?", typeof window.magellanBarcodeReader?.scan);
 
@@ -79,7 +78,7 @@ async function startBarcodePolling() {
                 await new Promise((resolve) => setTimeout(resolve, 200));
             }
         } catch (err) {
-            console.error("[Magellan] ❌ Odoo proxy error:", err.message);
+            console.error("[Magellan] ❌ Direct Pi fetch error:", err.message);
             console.error("[Magellan] ❌ Full error:", err);
             console.error("[Magellan] ❌ Error stack:", err.stack);
             // backoff a bit on errors
@@ -164,12 +163,11 @@ const magellanBarcodeReaderService = {
 
                                 let weight = null;
                                 try {
-                                    // Use Odoo proxy to avoid mixed content HTTPS→HTTP issue
-                                    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL.replace('http://', '').replace('https://', '');
-                                    const odooProxyUrl = `/labodega_pos/proxy/weight?bridge_url=${encodeURIComponent(bridgeUrl)}`;
+                                    // Direct fetch to Pi (browser and Pi on same LAN)
+                                    const piWeightUrl = `${BRIDGE_CONFIG.BRIDGE_URL}/weight`;
 
-                                    console.log("[Magellan] 🌐 Fetching weight via Odoo proxy:", odooProxyUrl);
-                                    const response = await fetch(odooProxyUrl, {
+                                    console.log("[Magellan] 🌐 Fetching weight directly from Pi:", piWeightUrl);
+                                    const response = await fetch(piWeightUrl, {
                                         method: 'GET',
                                         headers: {
                                             'Accept': 'application/json',
@@ -201,7 +199,7 @@ const magellanBarcodeReaderService = {
                                     }
                                 } catch (err) {
                                     console.error(
-                                        "[Magellan] ❌ Error calling /weight via Odoo proxy:",
+                                        "[Magellan] ❌ Error calling /weight directly from Pi:",
                                         err.message
                                     );
                                     console.error("[Magellan] ❌ Error stack:", err.stack);

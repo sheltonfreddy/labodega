@@ -7,11 +7,12 @@
  */
 
 export const BRIDGE_CONFIG = {
-    // Bridge server URL - Browser talks DIRECTLY to Pi (no Odoo proxy, no Tailscale)
-    // LAN IP: "http://10.0.0.35:8000" - Direct connection on same local network
+    // Bridge server URL - Browser talks DIRECTLY to Pi via HTTPS (no mixed content error)
+    // LAN IP: "https://10.0.0.35:8000" - Direct HTTPS connection on same local network
     //
-    // ✅ DIRECT LAN CONNECTION (no Tailscale needed)
-    BRIDGE_URL: "http://10.0.0.35:8000",
+    // ✅ HTTPS ENABLED (browser can connect from https://erp.labodegacalhoun.com)
+    // ⚠️  First time: Open https://10.0.0.35:8000 in browser and accept self-signed cert
+    BRIDGE_URL: "https://10.0.0.35:8000",
 
     // Polling interval in milliseconds
     // Lower = more responsive but more CPU/network usage
