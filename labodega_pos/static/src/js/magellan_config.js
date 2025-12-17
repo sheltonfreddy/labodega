@@ -7,14 +7,13 @@
  */
 
 export const BRIDGE_CONFIG = {
-    // Bridge server URL - Browser talks DIRECTLY to Pi via HTTPS (no mixed content error)
-    // LAN IP: "https://10.0.0.35:8000" - Direct HTTPS connection on same local network
+    // Bridge server URL - Browser talks DIRECTLY to Pi (not through Odoo server)
     //
-    // ✅ HTTPS ENABLED (browser can connect from https://erp.labodegacalhoun.com)
-    // ⚠️  First time: Open https://10.0.0.35:8000 in browser and accept self-signed cert
-    BRIDGE_URL: "https://10.0.0.35:8000",
-
-    // Polling interval in milliseconds
+    // IMPORTANT: This connection happens in the browser, on your LOCAL network
+    // The browser must be on the same LAN as the Raspberry Pi (10.0.0.x network)
+    //
+    // Using HTTP for now - change to https://10.0.0.35:8000 once SSL is configured on Pi
+    BRIDGE_URL: "http://10.0.0.35:8000",
     // Lower = more responsive but more CPU/network usage
     BARCODE_POLL_INTERVAL: 200,
 
