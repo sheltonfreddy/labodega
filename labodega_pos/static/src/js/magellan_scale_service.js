@@ -136,6 +136,9 @@ const magellanBarcodeReaderService = {
                     console.log("[Magellan] 🔔 PRODUCT CALLBACK HIT!");
                     console.log("[Magellan] 📦 parsedBarcode:", JSON.stringify(parsedBarcode));
 
+                    // Flag to track if we handled the product
+                    let handledWeightedProduct = false;
+
                     try {
                         // Get POS from multiple possible sources
                         let currentPos = pos || (this && this.pos) || (env && env.services && env.services.pos);
@@ -247,11 +250,17 @@ const magellanBarcodeReaderService = {
                                             "qty =",
                                             weight
                                         );
-                                        // Do NOT call originalProductCb to avoid extra qty=1
+
+                                        // Mark that we handled this product
+                                        handledWeightedProduct = true;
+                                        console.log("[Magellan] 🚫 Skipping original callback - already handled weighted product");
+
+                                        // Return early - do NOT call originalProductCb
                                         return;
                                     } catch (addErr) {
                                         console.error("[Magellan] ❌ Error adding product to order:", addErr.message);
                                         console.error("[Magellan] ❌ Falling back to default handler");
+                                        // handledWeightedProduct stays false, will call original callback
                                     }
                                 } else {
                                     console.warn(
@@ -275,9 +284,13 @@ const magellanBarcodeReaderService = {
                         console.error("[Magellan] ❌ Error stack:", err.stack);
                     }
 
-                    // Fallback: normal behavior - use captured context
-                    console.log("[Magellan] 🔄 Calling original product callback (fallback)");
-                    return originalProductCb.call(callbackContext || this, parsedBarcode);
+                    // Only call original callback if we didn't handle a weighted product
+                    if (!handledWeightedProduct) {
+                        console.log("[Magellan] 🔄 Calling original product callback (fallback)");
+                        return originalProductCb.call(callbackContext || this, parsedBarcode);
+                    } else {
+                        console.log("[Magellan] ✅ Weighted product handled, not calling original callback");
+                    }
                 };
 
                 cbMap.product = wrappedProductCb;
