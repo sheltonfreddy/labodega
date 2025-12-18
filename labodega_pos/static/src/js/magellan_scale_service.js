@@ -157,19 +157,18 @@ const magellanBarcodeReaderService = {
                         // Try to find product using available methods
                         let product = null;
                         if (currentPos && code) {
-                            if (currentPos.db && typeof currentPos.db.get_product_by_barcode === 'function') {
-                                product = currentPos.db.get_product_by_barcode(code);
-                            } else if (currentPos.models && currentPos.models['product.product']) {
-                                // Odoo 18 might use models
+                            // Odoo 18 uses pos.models['product.product']
+                            if (currentPos.models && currentPos.models['product.product']) {
                                 const products = currentPos.models['product.product'].getAll();
                                 product = products.find(p => p.barcode === code);
-                            } else if (currentPos.data && currentPos.data.products) {
-                                // Or data structure
-                                product = Object.values(currentPos.data.products).find(p => p.barcode === code);
+                                console.log("[Magellan] 🔍 Searched", products.length, "products, found:", !!product);
+                            }
+                            // Fallback for older Odoo versions
+                            else if (currentPos.db && typeof currentPos.db.get_product_by_barcode === 'function') {
+                                product = currentPos.db.get_product_by_barcode(code);
                             }
                         }
 
-                        if (product) {
                         if (product) {
                             console.log("[Magellan] 📦 Product found:", product.display_name || product.name);
                             console.log("[Magellan] 📦 Product details:", {
