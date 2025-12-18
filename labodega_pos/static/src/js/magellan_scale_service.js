@@ -7,6 +7,12 @@ console.log("[Magellan] magellan_scale_service.js loaded (DIRECT browser → Pi)
 console.log("[Magellan] Pi bridge URL:", BRIDGE_CONFIG.BRIDGE_URL);
 console.log("[Magellan] Direct LAN communication (browser → Pi) - NO TAILSCALE");
 
+// Polling control state
+let pollingActive = true;
+let pollingController = null;
+let lastScanTime = 0;
+const SCAN_DEBOUNCE_MS = 500; // Prevent duplicate scans within 500ms
+
 async function startBarcodePolling() {
     // wait until the barcodeReader service has been exposed
     while (!window.magellanBarcodeReader) {
@@ -15,20 +21,52 @@ async function startBarcodePolling() {
     }
 
     const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL;
-    console.log("[Magellan] Starting DIRECT barcode polling from Pi:", bridgeUrl);
-    console.log("[Magellan] Browser → Pi (same LAN) - no proxy needed!");
+    console.log("[Magellan] Starting OPTIMIZED barcode polling from Pi:", bridgeUrl);
+    console.log("[Magellan] Browser → Pi (same LAN) - with dynamic intervals");
 
     let pollCount = 0;
-    while (true) {
+    let consecutiveErrors = 0;
+    let consecutiveEmptyPolls = 0;
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        pollingActive = false;
+        console.log("[Magellan] Stopping polling - page unload");
+    });
+
+    // Pause polling when page is hidden (browser tab inactive)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            console.log("[Magellan] ⏸️ Page hidden - slowing poll rate");
+        } else {
+            console.log("[Magellan] ▶️ Page visible - resuming normal poll rate");
+            consecutiveEmptyPolls = 0; // Reset on activation
+        }
+    });
+
+    while (pollingActive) {
         try {
+            // Dynamic polling interval based on activity and visibility
+            let pollInterval = BRIDGE_CONFIG.BARCODE_POLL_INTERVAL; // Default 200ms
+
+            if (document.hidden) {
+                // Page not visible - poll much less frequently
+                pollInterval = 2000; // 2 seconds
+            } else if (consecutiveEmptyPolls > 100) {
+                // No activity for a while - slow down
+                pollInterval = 500; // 500ms
+            } else if (consecutiveEmptyPolls > 50) {
+                // Some inactivity - slightly slower
+                pollInterval = 300; // 300ms
+            }
+
             // Direct fetch to Pi (browser and Pi on same LAN)
             const piUrl = `${bridgeUrl}/barcode`;
-
             pollCount++;
 
-            // Log every 10 polls for debugging
-            if (pollCount % 10 === 0) {
-                console.log(`[Magellan] 🔄 Barcode poll #${pollCount} - direct fetch: ${piUrl}`);
+            // Reduced logging for better performance
+            if (pollCount % 50 === 0) {
+                console.log(`[Magellan] 🔄 Poll #${pollCount} (interval: ${pollInterval}ms, errors: ${consecutiveErrors})`);
             }
 
             const response = await fetch(piUrl, {
@@ -36,56 +74,77 @@ async function startBarcodePolling() {
                 headers: {
                     'Accept': 'application/json',
                 },
+                signal: AbortSignal.timeout(5000), // 5 second timeout
             });
 
-            console.log(`[Magellan] 📡 Poll #${pollCount} - Response status: ${response.status} ${response.statusText}`);
-
             if (!response.ok) {
-                console.error(`[Magellan] ❌ Bad response: ${response.status}`);
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-
-            // Log EVERY response to see what we're getting
-            console.log(`[Magellan] 📦 Poll #${pollCount} response data:`, JSON.stringify(data));
+            consecutiveErrors = 0; // Reset error count on success
 
             if (data && data.barcode) {
-                console.log("[Magellan] ✅✅✅ Got barcode directly from Pi:", data.barcode);
-                console.log("[Magellan] 🎯 window.magellanBarcodeReader exists?", !!window.magellanBarcodeReader);
-                console.log("[Magellan] 🎯 window.magellanBarcodeReader.scan exists?", typeof window.magellanBarcodeReader?.scan);
+                // Debounce: ignore if same barcode scanned too quickly
+                const now = Date.now();
+                if (now - lastScanTime < SCAN_DEBOUNCE_MS) {
+                    console.log("[Magellan] ⏭️ Debounced - ignoring rapid re-scan");
+                    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+                    continue;
+                }
+                lastScanTime = now;
+                consecutiveEmptyPolls = 0; // Reset on scan
+
+                console.log("[Magellan] ✅ Got barcode from Pi:", data.barcode);
 
                 try {
-                    if (!window.magellanBarcodeReader) {
-                        console.error("[Magellan] ❌ window.magellanBarcodeReader is null/undefined!");
-                    } else if (typeof window.magellanBarcodeReader.scan !== 'function') {
-                        console.error("[Magellan] ❌ window.magellanBarcodeReader.scan is not a function!");
-                    } else {
-                        console.log("[Magellan] 🚀 Calling barcodeReader.scan with:", data.barcode);
+                    if (window.magellanBarcodeReader?.scan) {
                         window.magellanBarcodeReader.scan(data.barcode);
-                        console.log("[Magellan] ✅ barcodeReader.scan called successfully");
+                        console.log("[Magellan] 📦 Barcode processed");
                     }
                 } catch (err) {
-                    console.error("[Magellan] ❌ Error calling barcodeReader.scan:", err);
-                    console.error("[Magellan] ❌ Error stack:", err.stack);
+                    console.error("[Magellan] ❌ Error processing barcode:", err.message);
                 }
+
+                // Small delay after successful scan
+                await new Promise((resolve) => setTimeout(resolve, 100));
             } else {
-                // Log null/empty responses occasionally
-                if (pollCount % 50 === 0) {
-                    console.log(`[Magellan] ⚪ Poll #${pollCount} - No barcode (empty response)`);
-                }
-                // no barcode → just loop again (poll every 200ms)
-                await new Promise((resolve) => setTimeout(resolve, 200));
+                consecutiveEmptyPolls++;
+                // Wait before next poll
+                await new Promise((resolve) => setTimeout(resolve, pollInterval));
             }
         } catch (err) {
-            console.error("[Magellan] ❌ Direct Pi fetch error:", err.message);
-            console.error("[Magellan] ❌ Full error:", err);
-            console.error("[Magellan] ❌ Error stack:", err.stack);
-            // backoff a bit on errors
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            consecutiveErrors++;
+
+            // Log errors less frequently to reduce console spam
+            if (consecutiveErrors === 1 || consecutiveErrors % 10 === 0) {
+                console.error(`[Magellan] ❌ Poll error (${consecutiveErrors} consecutive):`, err.message);
+            }
+
+            // Exponential backoff on repeated errors (max 10 seconds)
+            const backoffDelay = Math.min(2000 * Math.pow(1.5, Math.min(consecutiveErrors, 5)), 10000);
+            await new Promise((resolve) => setTimeout(resolve, backoffDelay));
         }
     }
+
+    console.log("[Magellan] Polling stopped");
 }
+
+// Expose control functions globally
+window.magellanPollingControl = {
+    pause: () => {
+        pollingActive = false;
+        console.log("[Magellan] Polling paused");
+    },
+    resume: () => {
+        if (!pollingActive) {
+            pollingActive = true;
+            console.log("[Magellan] Polling resumed");
+            startBarcodePolling().catch(err => console.error("[Magellan] Resume error:", err));
+        }
+    },
+    isActive: () => pollingActive
+};
 
 // Service wrapper to:
 // - patch barcode_reader for weighted products (call /weight via Odoo proxy)
@@ -130,11 +189,7 @@ const magellanBarcodeReaderService = {
                     // Capture the context on first call
                     if (!callbackContext) {
                         callbackContext = this;
-                        console.log("[Magellan] 🎯 Captured callback context:", !!callbackContext);
                     }
-
-                    console.log("[Magellan] 🔔 PRODUCT CALLBACK HIT!");
-                    console.log("[Magellan] 📦 parsedBarcode:", JSON.stringify(parsedBarcode));
 
                     // Flag to track if we handled the product
                     let handledWeightedProduct = false;
@@ -149,13 +204,6 @@ const magellanBarcodeReaderService = {
                         }
 
                         const code = parsedBarcode && parsedBarcode.code;
-                        console.log("[Magellan] 🏪 POS available?", !!currentPos, "| barcode code:", code);
-
-                        // Check multiple ways to access products in Odoo 18
-                        const hasDB = !!currentPos?.db;
-                        const hasModels = !!currentPos?.models;
-                        const hasData = !!currentPos?.data;
-                        console.log("[Magellan] 🏪 POS.db:", hasDB, "POS.models:", hasModels, "POS.data:", hasData);
 
                         // Try to find product using available methods
                         let product = null;
@@ -164,7 +212,6 @@ const magellanBarcodeReaderService = {
                             if (currentPos.models && currentPos.models['product.product']) {
                                 const products = currentPos.models['product.product'].getAll();
                                 product = products.find(p => p.barcode === code);
-                                console.log("[Magellan] 🔍 Searched", products.length, "products, found:", !!product);
                             }
                             // Fallback for older Odoo versions
                             else if (currentPos.db && typeof currentPos.db.get_product_by_barcode === 'function') {
@@ -173,17 +220,10 @@ const magellanBarcodeReaderService = {
                         }
 
                         if (product) {
-                            console.log("[Magellan] 📦 Product found:", product.display_name || product.name);
-                            console.log("[Magellan] 📦 Product details:", {
-                                id: product.id,
-                                name: product.display_name || product.name,
-                                to_weight: product.to_weight
-                            });
-
                             if (product && product.to_weight) {
                                 console.log(
-                                    "[Magellan] ⚖️ WEIGHTED PRODUCT DETECTED:",
-                                    product.display_name
+                                    "[Magellan] ⚖️ Weighted product:",
+                                    product.display_name || product.name
                                 );
 
                                 let weight = null;
@@ -191,22 +231,19 @@ const magellanBarcodeReaderService = {
                                     // Direct fetch to Pi (browser and Pi on same LAN)
                                     const piWeightUrl = `${BRIDGE_CONFIG.BRIDGE_URL}/weight`;
 
-                                    console.log("[Magellan] 🌐 Fetching weight directly from Pi:", piWeightUrl);
                                     const response = await fetch(piWeightUrl, {
                                         method: 'GET',
                                         headers: {
                                             'Accept': 'application/json',
                                         },
+                                        signal: AbortSignal.timeout(3000), // 3 second timeout
                                     });
-
-                                    console.log("[Magellan] ⚖️ Weight response status:", response.status);
 
                                     if (!response.ok) {
                                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                                     }
 
                                     const data = await response.json();
-                                    console.log("[Magellan] ⚖️ Weight response data:", JSON.stringify(data));
 
                                     if (
                                         data &&
@@ -215,40 +252,19 @@ const magellanBarcodeReaderService = {
                                         data.weight > 0
                                     ) {
                                         weight = data.weight;
-                                        console.log("[Magellan] ✅ Valid weight received:", weight);
+                                        console.log("[Magellan] ✅ Weight:", weight, "kg");
                                     } else {
-                                        console.warn(
-                                            "[Magellan] ⚠️ /weight returned invalid weight:",
-                                            data
-                                        );
+                                        console.warn("[Magellan] ⚠️ Invalid weight from scale");
                                     }
                                 } catch (err) {
-                                    console.error(
-                                        "[Magellan] ❌ Error calling /weight directly from Pi:",
-                                        err.message
-                                    );
-                                    console.error("[Magellan] ❌ Error stack:", err.stack);
+                                    console.error("[Magellan] ❌ Weight fetch error:", err.message);
                                 }
 
                                 if (weight && weight > 0) {
                                     try {
-                                        console.log("[Magellan] ➕ Adding weighted product to order:", product.display_name || product.name, "qty:", weight);
-                                        console.log("[Magellan] 🔍 DEBUG: product object:", {
-                                            id: product.id,
-                                            name: product.display_name || product.name,
-                                            to_weight: product.to_weight,
-                                            type: typeof product
-                                        });
-                                        console.log("[Magellan] 🔍 DEBUG: weight value:", weight, "type:", typeof weight);
-
-                                        // Get current order before adding
-                                        const orderBefore = currentPos.get_order();
-                                        const linesBefore = orderBefore ? orderBefore.get_orderlines().length : 0;
-                                        console.log("[Magellan] 🔍 DEBUG: Order lines before adding:", linesBefore);
-
                                         // Odoo 18 uses pos.addLineToCurrentOrder() instead of order.add_product()
                                         // Note: Odoo expects 'qty' not 'quantity', and configure=false prevents auto scale reading
-                                        const addedLine = await currentPos.addLineToCurrentOrder(
+                                        await currentPos.addLineToCurrentOrder(
                                             {
                                                 product_id: product,
                                                 qty: weight,  // Use 'qty' not 'quantity'!
@@ -257,25 +273,8 @@ const magellanBarcodeReaderService = {
                                             false  // configure=false to skip automatic scale reading
                                         );
 
-                                        console.log("[Magellan] 🔍 DEBUG: addLineToCurrentOrder returned:", addedLine);
-
-                                        // Check what was actually added
-                                        const orderAfter = currentPos.get_order();
-                                        const linesAfter = orderAfter ? orderAfter.get_orderlines() : [];
-                                        console.log("[Magellan] 🔍 DEBUG: Order lines after adding:", linesAfter.length);
-
-                                        if (linesAfter.length > 0) {
-                                            const lastLine = linesAfter[linesAfter.length - 1];
-                                            console.log("[Magellan] 🔍 DEBUG: Last order line:", {
-                                                product: lastLine.product_id?.display_name,
-                                                qty: lastLine.qty,
-                                                quantity: lastLine.quantity,
-                                                get_quantity: typeof lastLine.get_quantity === 'function' ? lastLine.get_quantity() : 'N/A'
-                                            });
-                                        }
-
                                         console.log(
-                                            "[Magellan] ✅ Successfully added weighted product",
+                                            "[Magellan] ✅ Added:",
                                             product.display_name || product.name,
                                             "qty =",
                                             weight
@@ -283,44 +282,25 @@ const magellanBarcodeReaderService = {
 
                                         // Mark that we handled this product
                                         handledWeightedProduct = true;
-                                        console.log("[Magellan] 🚫 Skipping original callback - already handled weighted product");
 
                                         // Return early - do NOT call originalProductCb
                                         return;
                                     } catch (addErr) {
-                                        console.error("[Magellan] ❌ Error adding product to order:", addErr.message);
-                                        console.error("[Magellan] ❌ Error stack:", addErr.stack);
-                                        console.error("[Magellan] ❌ Falling back to default handler");
+                                        console.error("[Magellan] ❌ Add error:", addErr.message);
                                         // handledWeightedProduct stays false, will call original callback
                                     }
                                 } else {
-                                    console.warn(
-                                        "[Magellan] ⚠️ No valid weight, falling back to default handler"
-                                    );
+                                    console.warn("[Magellan] ⚠️ No valid weight, using default handler");
                                 }
-                            }
-                        } else {
-                            console.log("[Magellan] ⚪ Product not found or POS not ready");
-                            console.log("[Magellan] ⚪ currentPos:", !!currentPos, "code:", code);
-                            if (currentPos) {
-                                console.log("[Magellan] ⚪ Available props:", Object.keys(currentPos).slice(0, 10));
                             }
                         }
                     } catch (err) {
-                        console.error(
-                            "[Magellan] ❌ Error in wrapped product callback:",
-                            err
-                        );
-                        console.error("[Magellan] ❌ Error message:", err.message);
-                        console.error("[Magellan] ❌ Error stack:", err.stack);
+                        console.error("[Magellan] ❌ Error:", err.message);
                     }
 
                     // Only call original callback if we didn't handle a weighted product
                     if (!handledWeightedProduct) {
-                        console.log("[Magellan] 🔄 Calling original product callback (fallback)");
                         return originalProductCb.call(callbackContext || this, parsedBarcode);
-                    } else {
-                        console.log("[Magellan] ✅ Weighted product handled, not calling original callback");
                     }
                 };
 
