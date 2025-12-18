@@ -228,21 +228,30 @@ const magellanBarcodeReaderService = {
                                 }
 
                                 if (weight && weight > 0) {
-                                    const order = currentPos.get_order();
-                                    console.log("[Magellan] 🛒 Current order:", !!order);
-                                    if (order) {
-                                        console.log("[Magellan] ➕ Adding weighted product to order:", product.display_name, "qty:", weight);
-                                        order.add_product(product, { quantity: weight });
+                                    try {
+                                        console.log("[Magellan] ➕ Adding weighted product to order:", product.display_name || product.name, "qty:", weight);
+
+                                        // Odoo 18 uses pos.addLineToCurrentOrder() instead of order.add_product()
+                                        await currentPos.addLineToCurrentOrder(
+                                            {
+                                                product_id: product,
+                                                quantity: weight,
+                                            },
+                                            {},
+                                            true
+                                        );
+
                                         console.log(
                                             "[Magellan] ✅ Successfully added weighted product",
-                                            product.display_name,
+                                            product.display_name || product.name,
                                             "qty =",
                                             weight
                                         );
                                         // Do NOT call originalProductCb to avoid extra qty=1
                                         return;
-                                    } else {
-                                        console.error("[Magellan] ❌ No current order!");
+                                    } catch (addErr) {
+                                        console.error("[Magellan] ❌ Error adding product to order:", addErr.message);
+                                        console.error("[Magellan] ❌ Falling back to default handler");
                                     }
                                 } else {
                                     console.warn(
