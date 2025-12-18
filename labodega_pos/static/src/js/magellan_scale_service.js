@@ -138,22 +138,45 @@ const magellanBarcodeReaderService = {
 
                     try {
                         // Get POS from multiple possible sources
-                        const currentPos = pos || (this && this.pos) || (env && env.services && env.services.pos);
+                        let currentPos = pos || (this && this.pos) || (env && env.services && env.services.pos);
+
+                        // Try to get POS from callback context if not found
+                        if (!currentPos && callbackContext) {
+                            currentPos = callbackContext.pos || callbackContext.env?.services?.pos;
+                        }
+
                         const code = parsedBarcode && parsedBarcode.code;
                         console.log("[Magellan] 🏪 POS available?", !!currentPos, "| barcode code:", code);
-                        console.log("[Magellan] 🏪 POS.db available?", !!currentPos?.db);
 
-                        if (currentPos && currentPos.db && code) {
-                            console.log("[Magellan] 🔍 Looking up product with barcode:", code);
-                            const product = currentPos.db.get_product_by_barcode(code);
-                            console.log("[Magellan] 📦 Product found:", !!product);
-                            if (product) {
-                                console.log("[Magellan] 📦 Product details:", {
-                                    id: product.id,
-                                    name: product.display_name,
-                                    to_weight: product.to_weight
-                                });
+                        // Check multiple ways to access products in Odoo 18
+                        const hasDB = !!currentPos?.db;
+                        const hasModels = !!currentPos?.models;
+                        const hasData = !!currentPos?.data;
+                        console.log("[Magellan] 🏪 POS.db:", hasDB, "POS.models:", hasModels, "POS.data:", hasData);
+
+                        // Try to find product using available methods
+                        let product = null;
+                        if (currentPos && code) {
+                            if (currentPos.db && typeof currentPos.db.get_product_by_barcode === 'function') {
+                                product = currentPos.db.get_product_by_barcode(code);
+                            } else if (currentPos.models && currentPos.models['product.product']) {
+                                // Odoo 18 might use models
+                                const products = currentPos.models['product.product'].getAll();
+                                product = products.find(p => p.barcode === code);
+                            } else if (currentPos.data && currentPos.data.products) {
+                                // Or data structure
+                                product = Object.values(currentPos.data.products).find(p => p.barcode === code);
                             }
+                        }
+
+                        if (product) {
+                        if (product) {
+                            console.log("[Magellan] 📦 Product found:", product.display_name || product.name);
+                            console.log("[Magellan] 📦 Product details:", {
+                                id: product.id,
+                                name: product.display_name || product.name,
+                                to_weight: product.to_weight
+                            });
 
                             if (product && product.to_weight) {
                                 console.log(
@@ -229,8 +252,11 @@ const magellanBarcodeReaderService = {
                                 }
                             }
                         } else {
-                            console.log("[Magellan] ⚪ Skipping: missing POS/DB or barcode code");
-                            console.log("[Magellan] ⚪ currentPos:", !!currentPos, "db:", !!currentPos?.db, "code:", code);
+                            console.log("[Magellan] ⚪ Product not found or POS not ready");
+                            console.log("[Magellan] ⚪ currentPos:", !!currentPos, "code:", code);
+                            if (currentPos) {
+                                console.log("[Magellan] ⚪ Available props:", Object.keys(currentPos).slice(0, 10));
+                            }
                         }
                     } catch (err) {
                         console.error(
