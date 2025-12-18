@@ -233,16 +233,46 @@ const magellanBarcodeReaderService = {
                                 if (weight && weight > 0) {
                                     try {
                                         console.log("[Magellan] ➕ Adding weighted product to order:", product.display_name || product.name, "qty:", weight);
+                                        console.log("[Magellan] 🔍 DEBUG: product object:", {
+                                            id: product.id,
+                                            name: product.display_name || product.name,
+                                            to_weight: product.to_weight,
+                                            type: typeof product
+                                        });
+                                        console.log("[Magellan] 🔍 DEBUG: weight value:", weight, "type:", typeof weight);
+
+                                        // Get current order before adding
+                                        const orderBefore = currentPos.get_order();
+                                        const linesBefore = orderBefore ? orderBefore.get_orderlines().length : 0;
+                                        console.log("[Magellan] 🔍 DEBUG: Order lines before adding:", linesBefore);
 
                                         // Odoo 18 uses pos.addLineToCurrentOrder() instead of order.add_product()
-                                        await currentPos.addLineToCurrentOrder(
+                                        // Note: Odoo expects 'qty' not 'quantity', and configure=false prevents auto scale reading
+                                        const addedLine = await currentPos.addLineToCurrentOrder(
                                             {
                                                 product_id: product,
-                                                quantity: weight,
+                                                qty: weight,  // Use 'qty' not 'quantity'!
                                             },
                                             {},
-                                            true
+                                            false  // configure=false to skip automatic scale reading
                                         );
+
+                                        console.log("[Magellan] 🔍 DEBUG: addLineToCurrentOrder returned:", addedLine);
+
+                                        // Check what was actually added
+                                        const orderAfter = currentPos.get_order();
+                                        const linesAfter = orderAfter ? orderAfter.get_orderlines() : [];
+                                        console.log("[Magellan] 🔍 DEBUG: Order lines after adding:", linesAfter.length);
+
+                                        if (linesAfter.length > 0) {
+                                            const lastLine = linesAfter[linesAfter.length - 1];
+                                            console.log("[Magellan] 🔍 DEBUG: Last order line:", {
+                                                product: lastLine.product_id?.display_name,
+                                                qty: lastLine.qty,
+                                                quantity: lastLine.quantity,
+                                                get_quantity: typeof lastLine.get_quantity === 'function' ? lastLine.get_quantity() : 'N/A'
+                                            });
+                                        }
 
                                         console.log(
                                             "[Magellan] ✅ Successfully added weighted product",
@@ -259,6 +289,7 @@ const magellanBarcodeReaderService = {
                                         return;
                                     } catch (addErr) {
                                         console.error("[Magellan] ❌ Error adding product to order:", addErr.message);
+                                        console.error("[Magellan] ❌ Error stack:", addErr.stack);
                                         console.error("[Magellan] ❌ Falling back to default handler");
                                         // handledWeightedProduct stays false, will call original callback
                                     }
