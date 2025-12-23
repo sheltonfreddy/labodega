@@ -15,7 +15,7 @@ export const BRIDGE_CONFIG = {
     // Using HTTPS to avoid mixed content warnings on HTTPS Odoo site
     // First time: You may need to accept the self-signed certificate by visiting
     // https://10.0.0.35:8000 directly in your browser
-    BRIDGE_URL: "https://magellan-scale.local:8000",
+    BRIDGE_URL: "https://10.0.0.35:8000",
     // Lower = more responsive but more CPU/network usage
     BARCODE_POLL_INTERVAL: 200,
 
