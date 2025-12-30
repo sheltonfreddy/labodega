@@ -310,6 +310,153 @@ const magellanBarcodeReaderService = {
             return originalRegister(cbMap, exclusive);
         };
 
+        // **NEW: Patch addLineToCurrentOrder to handle manual weighted product selection**
+        if (pos && typeof pos.addLineToCurrentOrder === 'function') {
+            const originalAddLine = pos.addLineToCurrentOrder.bind(pos);
+
+            pos.addLineToCurrentOrder = async function(product, options = {}, configure = true) {
+                console.log("[Magellan] 🔍 addLineToCurrentOrder called - product:", product, "configure:", configure);
+
+                // Extract the actual product object
+                const productObj = product && product.product_id ? product.product_id : product;
+
+                // Check if it's a weighted product
+                if (productObj && productObj.to_weight) {
+                    console.log("[Magellan] ⚖️ Manual weighted product selected:", productObj.display_name || productObj.name);
+
+                    // Check if quantity is already provided (from barcode scan wrapper)
+                    if (product.qty && product.qty > 0 && !configure) {
+                        console.log("[Magellan] ✅ Using pre-fetched qty from barcode:", product.qty);
+                        return originalAddLine.call(this, product, options, false);
+                    }
+
+                    // Manual selection - need to fetch weight from scale
+                    let weight = null;
+                    try {
+                        const piWeightUrl = `${BRIDGE_CONFIG.BRIDGE_URL}/weight`;
+                        console.log("[Magellan] 🌐 Fetching weight for manual selection...");
+
+                        const response = await fetch(piWeightUrl, {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' },
+                            signal: AbortSignal.timeout(3000),
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data && data.weight > 0) {
+                                weight = data.weight;
+                                console.log("[Magellan] ✅ Manual selection weight:", weight, "kg");
+                            }
+                        }
+                    } catch (err) {
+                        console.error("[Magellan] ❌ Weight fetch error:", err.message);
+                    }
+
+                    if (weight && weight > 0) {
+                        // Add with fetched weight
+                        console.log("[Magellan] ➕ Adding manually selected product with weight:", weight);
+                        return originalAddLine.call(this, {
+                            product_id: productObj,
+                            qty: weight
+                        }, options, false);
+                    } else {
+                        // No weight on scale - block addition and show warning
+                        console.warn("[Magellan] ⚠️ No weight on scale - manual product NOT added");
+
+                        if (this.env && this.env.services && this.env.services.notification) {
+                            this.env.services.notification.add(
+                                "Please place product on scale before selecting",
+                                { type: "warning" }
+                            );
+                        }
+
+                        return; // Don't add product
+                    }
+                }
+
+                // Non-weighted product or configure=true - use original behavior
+                return originalAddLine.call(this, product, options, configure);
+            };
+
+            console.log("[Magellan] ✅ Patched addLineToCurrentOrder for manual weighted products");
+        }
+
+        // Patch addLineToCurrentOrder to handle MANUAL product selection for weighted products
+        if (pos && typeof pos.addLineToCurrentOrder === 'function') {
+            const originalAddLine = pos.addLineToCurrentOrder.bind(pos);
+
+            pos.addLineToCurrentOrder = async function(product, options = {}, configure = true) {
+                // Extract the actual product object
+                const productObj = product && product.product_id ? product.product_id : product;
+
+                // Check if it's a weighted product
+                if (productObj && productObj.to_weight) {
+                    console.log("[Magellan] ⚖️ Manual weighted product selected:", productObj.display_name || productObj.name);
+
+                    // Check if quantity already provided (from barcode scan with weight)
+                    if (product.qty && product.qty > 0 && product.qty !== 1) {
+                        console.log("[Magellan] ✅ Using provided qty from barcode:", product.qty);
+                        return originalAddLine.call(this, product, options, false);
+                    }
+
+                    // Fetch weight from scale for manual selection
+                    let weight = null;
+                    try {
+                        const piWeightUrl = `${BRIDGE_CONFIG.BRIDGE_URL}/weight`;
+                        console.log("[Magellan] 🌐 Fetching weight for manual selection...");
+
+                        const response = await fetch(piWeightUrl, {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' },
+                            signal: AbortSignal.timeout(3000),
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data && data.weight > 0) {
+                                weight = data.weight;
+                                console.log("[Magellan] ✅ Weight from scale:", weight, "kg");
+                            } else {
+                                console.warn("[Magellan] ⚠️ No weight on scale");
+                            }
+                        } else {
+                            console.error("[Magellan] ❌ Weight fetch failed:", response.status);
+                        }
+                    } catch (err) {
+                        console.error("[Magellan] ❌ Weight fetch error:", err.message);
+                    }
+
+                    if (weight && weight > 0) {
+                        // Add with fetched weight
+                        console.log("[Magellan] ➕ Adding manual product with weight:", weight);
+                        return originalAddLine.call(this, {
+                            product_id: productObj,
+                            qty: weight
+                        }, options, false); // configure=false to prevent Odoo's built-in scale dialog
+                    } else {
+                        // No weight on scale - show warning and don't add
+                        console.warn("[Magellan] ⚠️ No weight on scale - product not added");
+
+                        // Show notification to user
+                        if (this.env && this.env.services && this.env.services.notification) {
+                            this.env.services.notification.add(
+                                `Please place ${productObj.display_name || productObj.name} on the scale`,
+                                { type: "warning" }
+                            );
+                        }
+
+                        return; // Don't add product without weight
+                    }
+                }
+
+                // Non-weighted product - use original behavior
+                return originalAddLine.call(this, product, options, configure);
+            };
+
+            console.log("[Magellan] ✅ Patched addLineToCurrentOrder for manual weighted product selection");
+        }
+
         // kick off barcode polling loop (once)
         startBarcodePolling().catch((err) => {
             console.error("[Magellan] Error starting polling:", err);
