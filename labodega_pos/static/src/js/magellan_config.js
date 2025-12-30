@@ -16,7 +16,7 @@ export const BRIDGE_CONFIG = {
     // First time: You may need to accept the self-signed certificate by visiting
     // https://10.0.0.35:8000 directly in your browser
     //BRIDGE_URL: "https://172.16.19.185:8000",
-    BRIDGE_URL: "https://10.0.0.35:8000"
+    BRIDGE_URL: "https://10.0.0.35:8000",
     // Lower = more responsive but more CPU/network usage
     BARCODE_POLL_INTERVAL: 200,
 
