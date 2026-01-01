@@ -1,384 +1,157 @@
-/* ================================================
-   COMPACT RECEIPT STYLES - Walmart/Kroger Style
-   Minimal spacing, clean layout, easy to read
-   ================================================ */
+/* ===== Compact 80mm grocery receipt ===== */
 
-/* =============== FORCE COMPACT OVERRIDES =============== */
-/* These rules override default Odoo POS receipt styling */
-
-.compact-receipt {
-    font-family: 'Courier New', monospace !important;
-    font-size: 11px !important;
-    line-height: 1.2 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 80mm !important;
-    color: #000 !important;
-    background: #fff !important;
+.pos-receipt.compact-receipt.compact80{
+  width: 72mm;              /* 80mm paper with margins */
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.12;
+  padding: 3px 5px;
+  margin: 0;
+  color: #000;
+  background: #fff;
 }
 
-/* Remove all default Bootstrap padding */
-.compact-receipt.p-2 {
-    padding: 0 !important;
+/* Kill inherited spacing from bootstrap / odoo blocks */
+.pos-receipt.compact-receipt *{
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
 }
 
-/* Compact all child elements */
-.compact-receipt * {
-    margin-top: 0 !important;
-    margin-bottom: 2px !important;
+.pos-receipt.compact-receipt .h1{
+  font-weight: 900;
+  font-size: 13px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
-.compact-receipt .pos-receipt-amount {
-    font-size: 11px !important;
-    margin: 1px 0 !important;
-    padding: 0 !important;
+.pos-receipt.compact-receipt .h2{
+  font-size: 10px;
+  margin-bottom: 3px;
 }
 
-.compact-receipt .pos-receipt-contact {
-    font-size: 10px !important;
-    line-height: 1.2 !important;
-    margin: 1px 0 !important;
+.pos-receipt.compact-receipt .meta{
+  font-size: 10px;
+  margin-bottom: 2px;
 }
 
-.compact-receipt .pos-receipt-order-data {
-    font-size: 10px !important;
-    line-height: 1.2 !important;
-    margin: 1px 0 !important;
+.pos-receipt.compact-receipt .meta-row{
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0;
 }
 
-.compact-receipt .orderline {
-    margin: 2px 0 !important;
-    padding: 2px 0 !important;
+.pos-receipt.compact-receipt .meta-lbl{
+  font-weight: 700;
 }
 
-.compact-receipt .compact-separator {
-    font-size: 9px !important;
-    line-height: 1 !important;
-    margin: 1px 0 !important;
-    letter-spacing: -0.5px;
+.pos-receipt.compact-receipt .sep{
+  white-space: pre;
+  font-size: 9px;
+  line-height: 1;
+  margin: 2px 0;
 }
 
-.compact-receipt br {
-    line-height: 0.5 !important;
-    margin: 0 !important;
+.pos-receipt.compact-receipt .sep.thin{
+  margin: 1px 0;
 }
 
-/* =============== LAYOUT UTILITIES =============== */
-
-.compact-line {
-    display: flex;
-    justify-content: space-between;
-    margin: 1px 0;
-    padding: 0;
+.pos-receipt.compact-receipt .row{
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
 }
 
-.compact-subline {
-    font-size: 10px;
-    margin: 0 0 1px 0;
-    padding: 0 0 0 4px;
-    color: #333;
+.pos-receipt.compact-receipt .left{
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.compact-center {
-    text-align: center;
-    margin: 1px 0;
+.pos-receipt.compact-receipt .right{
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
-.compact-label {
-    flex: 1;
-    text-align: left;
+.pos-receipt.compact-receipt .lines .row.item{
+  margin: 1px 0;
 }
 
-.compact-value {
-    text-align: right;
-    white-space: nowrap;
+.pos-receipt.compact-receipt .name{
+  text-transform: uppercase;
 }
 
-/* =============== SEPARATORS =============== */
-
-.separator {
-    text-align: center;
-    margin: 2px 0;
-    font-size: 9px;
-    letter-spacing: -0.5px;
-    line-height: 1;
+.pos-receipt.compact-receipt .qty{
+  font-weight: 700;
 }
 
-.separator-light {
-    text-align: center;
-    margin: 1px 0;
-    font-size: 9px;
-    letter-spacing: -0.5px;
-    line-height: 1;
+.pos-receipt.compact-receipt .sub{
+  font-size: 10px;
+  opacity: 0.9;
+  margin: 0 0 1px 2px; /* tiny indent only */
+  white-space: nowrap;
 }
 
-/* =============== HEADER =============== */
-
-.compact-header {
-    margin-bottom: 3px;
+.pos-receipt.compact-receipt .note{
+  font-size: 10px;
+  font-style: italic;
+  margin: 0 0 1px 0;
+  white-space: normal;
 }
 
-.compact-logo {
-    max-width: 40%;
-    height: auto;
-    margin: 2px auto;
-    display: block;
+.pos-receipt.compact-receipt .totals{
+  margin-top: 1px;
 }
 
-.store-name {
-    font-size: 14px;
-    font-weight: bold;
-    margin: 2px 0;
-    text-transform: uppercase;
+.pos-receipt.compact-receipt .row.grand{
+  font-weight: 900;
+  font-size: 13px;
+  margin-top: 1px;
 }
 
-.store-info {
-    font-size: 9px;
-    margin: 1px 0;
-    line-height: 1.3;
+.pos-receipt.compact-receipt .row.savings{
+  font-weight: 800;
 }
 
-.tracking-number {
-    font-size: 12px;
-    font-weight: bold;
-    margin: 3px 0;
+.pos-receipt.compact-receipt .terminal{
+  margin: 1px 0 2px 0;
+  text-align: center;
 }
 
-.big-tracking {
-    font-size: 24px;
-    font-weight: bold;
-    letter-spacing: 2px;
+.pos-receipt.compact-receipt .terminal pre{
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 9px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.cashier-info {
-    font-size: 10px;
-    margin: 2px 0;
+.pos-receipt.compact-receipt .footer-text{
+  font-size: 10px;
+  margin-top: 3px;
+  white-space: pre-line;
+  text-align: center;
 }
 
-.custom-header {
-    font-size: 10px;
-    margin: 2px 0;
-    white-space: pre-line;
+.pos-receipt.compact-receipt .footer{
+  margin-top: 4px;
+  text-align: center;
 }
 
-/* =============== ORDER LINES =============== */
-
-.compact-orderlines {
-    margin: 3px 0;
+.pos-receipt.compact-receipt .thanks{
+  font-weight: 900;
+  margin-bottom: 1px;
 }
 
-.compact-orderline {
-    margin: 3px 0;
-    padding: 0;
+.pos-receipt.compact-receipt .small{
+  font-size: 9px;
 }
 
-.product-line {
-    font-weight: normal;
-}
-
-.product-name {
-    flex: 1;
-    font-size: 11px;
-    text-transform: uppercase;
-}
-
-.product-price {
-    font-weight: bold;
-    font-size: 11px;
-}
-
-.qty-info {
-    font-size: 10px;
-}
-
-.original-price {
-    font-size: 9px;
-    text-decoration: line-through;
-    color: #666;
-    margin-left: 4px;
-}
-
-.discount-info {
-    font-weight: bold;
-    color: #d00;
-}
-
-.customer-note {
-    font-style: italic;
-    color: #555;
-}
-
-.lot-info {
-    font-size: 9px;
-    font-family: monospace;
-}
-
-/* =============== TOTALS SECTION =============== */
-
-.tax-line {
-    font-size: 10px;
-}
-
-.total-line {
-    font-size: 12px;
-    margin: 2px 0;
-}
-
-.payment-line {
-    font-size: 11px;
-    margin: 1px 0;
-}
-
-.change-line {
-    font-size: 12px;
-    margin: 2px 0;
-}
-
-.savings-line {
-    font-size: 11px;
-    margin: 2px 0;
-    color: #d00;
-}
-
-/* =============== UTILITIES =============== */
-
-.bold {
-    font-weight: bold;
-}
-
-.uppercase {
-    text-transform: uppercase;
-}
-
-.small-text {
-    font-size: 9px;
-    line-height: 1.3;
-}
-
-/* =============== FOOTER =============== */
-
-.footer-text {
-    font-size: 10px;
-    margin: 2px 0;
-    white-space: pre-line;
-}
-
-.thank-you {
-    font-size: 12px;
-    font-weight: bold;
-    margin: 4px 0 2px 0;
-    text-transform: uppercase;
-}
-
-/* =============== QR CODE =============== */
-
-.compact-qr {
-    max-width: 120px;
-    height: auto;
-    margin: 3px auto;
-    display: block;
-}
-
-/* =============== PAYMENT TERMINAL =============== */
-
-.payment-terminal-receipt {
-    text-align: center;
-    margin: 2px 0;
-}
-
-.payment-terminal-receipt pre {
-    font-family: 'Courier New', monospace;
-    font-size: 9px;
-    margin: 0;
-    padding: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-
-/* =============== PRINT OPTIMIZATIONS =============== */
-
+/* print safety */
 @media print {
-    .compact-receipt {
-        font-size: 10px;
-        max-width: 80mm;
-        margin: 0;
-        padding: 2mm;
-    }
-
-    .separator,
-    .separator-light {
-        page-break-inside: avoid;
-    }
-
-    .compact-orderline {
-        page-break-inside: avoid;
-    }
-
-    /* Ensure black text on white background */
-    .compact-receipt,
-    .compact-receipt * {
-        color: #000 !important;
-        background: #fff !important;
-    }
-
-    /* Remove any shadows or borders */
-    .compact-receipt,
-    .compact-receipt * {
-        box-shadow: none !important;
-        border: none !important;
-    }
-}
-
-/* =============== RESPONSIVE ADJUSTMENTS =============== */
-
-@media screen and (max-width: 400px) {
-    .compact-receipt {
-        font-size: 10px;
-    }
-
-    .store-name {
-        font-size: 13px;
-    }
-
-    .total-line {
-        font-size: 11px;
-    }
-}
-
-/* =============== THERMAL PRINTER OPTIMIZATIONS =============== */
-
-/* For 58mm thermal printers */
-@media (max-width: 58mm) {
-    .compact-receipt {
-        font-size: 9px;
-    }
-
-    .compact-logo {
-        max-width: 35%;
-    }
-
-    .store-name {
-        font-size: 12px;
-    }
-}
-
-/* For 80mm thermal printers (most common) */
-@media (min-width: 58mm) and (max-width: 80mm) {
-    .compact-receipt {
-        font-size: 11px;
-        max-width: 80mm;
-    }
-}
-
-/* =============== DARK MODE OVERRIDE (for screen preview) =============== */
-
-@media (prefers-color-scheme: dark) {
-    .compact-receipt {
-        background: #fff !important;
-        color: #000 !important;
-    }
-
-    .compact-receipt * {
-        color: #000 !important;
-    }
+  .pos-receipt.compact-receipt.compact80{
+    padding: 2mm;
+  }
 }
