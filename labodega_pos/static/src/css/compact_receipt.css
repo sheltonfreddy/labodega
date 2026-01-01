@@ -3,15 +3,64 @@
    Minimal spacing, clean layout, easy to read
    ================================================ */
 
+/* =============== FORCE COMPACT OVERRIDES =============== */
+/* These rules override default Odoo POS receipt styling */
+
 .compact-receipt {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    line-height: 1.2;
-    padding: 0;
-    margin: 0;
-    max-width: 80mm; /* Standard thermal printer width */
-    color: #000;
-    background: #fff;
+    font-family: 'Courier New', monospace !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 80mm !important;
+    color: #000 !important;
+    background: #fff !important;
+}
+
+/* Remove all default Bootstrap padding */
+.compact-receipt.p-2 {
+    padding: 0 !important;
+}
+
+/* Compact all child elements */
+.compact-receipt * {
+    margin-top: 0 !important;
+    margin-bottom: 2px !important;
+}
+
+.compact-receipt .pos-receipt-amount {
+    font-size: 11px !important;
+    margin: 1px 0 !important;
+    padding: 0 !important;
+}
+
+.compact-receipt .pos-receipt-contact {
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    margin: 1px 0 !important;
+}
+
+.compact-receipt .pos-receipt-order-data {
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    margin: 1px 0 !important;
+}
+
+.compact-receipt .orderline {
+    margin: 2px 0 !important;
+    padding: 2px 0 !important;
+}
+
+.compact-receipt .compact-separator {
+    font-size: 9px !important;
+    line-height: 1 !important;
+    margin: 1px 0 !important;
+    letter-spacing: -0.5px;
+}
+
+.compact-receipt br {
+    line-height: 0.5 !important;
+    margin: 0 !important;
 }
 
 /* =============== LAYOUT UTILITIES =============== */
@@ -333,4 +382,3 @@
         color: #000 !important;
     }
 }
-
