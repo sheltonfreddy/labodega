@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <!-- Compact Walmart/Kroger Style Receipt -->
+    <t t-name="labodega_pos.CompactOrderReceipt" t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="primary">
+        <!-- Override the entire receipt structure for compact layout -->
+        <xpath expr="//div[@class='pos-receipt p-2']" position="replace">
+            <div class="pos-receipt compact-receipt">
+                <!-- Compact Header -->
+                <t t-call="labodega_pos.CompactReceiptHeader">
+                    <t t-set="data" t-value="props.data.headerData"/>
+                </t>
+
+                <!-- Order Lines - Compact Style -->
+                <div class="compact-orderlines">
+                    <div class="separator">========================================</div>
+                    <t t-foreach="props.data.orderlines || []" t-as="line" t-key="line_index">
+                        <t t-call="labodega_pos.CompactOrderline">
+                            <t t-set="line" t-value="line"/>
+                            <t t-set="formatCurrency" t-value="props.formatCurrency"/>
+                        </t>
+                    </t>
+                    <div class="separator">========================================</div>
+                </div>
+
+                <!-- Subtotal and Taxes -->
+                <t t-if="!props.basic_receipt">
+                    <t t-set="taxTotals" t-value="props.data.taxTotals"/>
+
+                    <!-- Subtotal -->
+                    <div class="compact-line">
+                        <span class="compact-label">SUBTOTAL</span>
+                        <span class="compact-value" t-esc="props.formatCurrency(taxTotals.subtotals?.[0]?.base_amount_currency || 0)"/>
+                    </div>
+
+                    <!-- Tax Details -->
+                    <t t-if="taxTotals and taxTotals.has_tax_groups">
+                        <t t-foreach="taxTotals.subtotals" t-as="subtotal" t-key="subtotal.name">
+                            <t t-foreach="subtotal.tax_groups" t-as="tax_group" t-key="tax_group.id">
+                                <div class="compact-line tax-line">
+                                    <span class="compact-label">
+                                        <t t-esc="tax_group.group_name"/>
+                                    </span>
+                                    <span class="compact-value" t-esc="props.formatCurrency(tax_group.tax_amount_currency)"/>
+                                </div>
+                            </t>
+                        </t>
+                    </t>
+
+                    <!-- Total -->
+                    <div class="separator-light">----------------------------------------</div>
+                    <div class="compact-line total-line">
+                        <span class="compact-label bold">TOTAL</span>
+                        <span class="compact-value bold" t-esc="props.formatCurrency(taxTotals.order_sign * taxTotals.order_total)"/>
+                    </div>
+
+                    <!-- Rounding if applicable -->
+                    <t t-if="props.data.show_rounding">
+                        <div class="compact-line">
+                            <span class="compact-label">ROUNDING</span>
+                            <span class="compact-value" t-esc="props.formatCurrency(taxTotals.order_sign * taxTotals.order_rounding)"/>
+                        </div>
+                        <div class="compact-line total-line">
+                            <span class="compact-label bold">TO PAY</span>
+                            <span class="compact-value bold" t-esc="props.formatCurrency(taxTotals.order_sign * (taxTotals.order_total + taxTotals.order_rounding))"/>
+                        </div>
+                    </t>
+
+                    <div class="separator">========================================</div>
+
+                    <!-- Payment Lines -->
+                    <t t-foreach="props.data.paymentlines" t-as="line" t-key="line_index">
+                        <div class="compact-line payment-line">
+                            <span class="compact-label uppercase" t-esc="line.name"/>
+                            <span class="compact-value" t-esc="props.formatCurrency(line.amount)"/>
+                        </div>
+                    </t>
+
+                    <!-- Change -->
+                    <t t-if="props.data.show_change">
+                        <div class="compact-line change-line">
+                            <span class="compact-label bold">CHANGE</span>
+                            <span class="compact-value bold" t-esc="props.formatCurrency(props.data.order_change)"/>
+                        </div>
+                    </t>
+
+                    <!-- Discount Summary -->
+                    <t t-if="props.data.total_discount">
+                        <div class="separator-light">----------------------------------------</div>
+                        <div class="compact-line savings-line">
+                            <span class="compact-label bold">YOU SAVED</span>
+                            <span class="compact-value bold" t-esc="props.formatCurrency(props.data.total_discount)"/>
+                        </div>
+                    </t>
+
+                    <div class="separator">========================================</div>
+
+                    <!-- QR Code and Invoice Info -->
+                    <t t-if="props.data.pos_qr_code">
+                        <div class="compact-center small-text">
+                            NEED AN INVOICE?
+                        </div>
+                        <t t-if="['qr_code', 'qr_code_and_url'].includes(props.data.headerData.company.point_of_sale_ticket_portal_url_display_mode)">
+                            <div class="compact-center">
+                                <img id="posqrcode" t-att-src="props.data.pos_qr_code" class="compact-qr"/>
+                            </div>
+                        </t>
+                        <div class="compact-center small-text">
+                            Code: <t t-esc="props.data.ticket_code"/>
+                        </div>
+                        <t t-if="['url', 'qr_code_and_url'].includes(props.data.headerData.company.point_of_sale_ticket_portal_url_display_mode)">
+                            <div class="compact-center small-text">
+                                <t t-esc="getPortalURL()"/>
+                            </div>
+                        </t>
+                    </t>
+
+                    <!-- Payment Terminal Receipts -->
+                    <t t-foreach="props.data.paymentlines" t-as="line" t-key="line_index">
+                        <t t-if="line.ticket">
+                            <div class="separator-light">----------------------------------------</div>
+                            <div class="payment-terminal-receipt">
+                                <pre t-esc="line.ticket"/>
+                            </div>
+                        </t>
+                    </t>
+                </t>
+
+                <!-- Footer -->
+                <t t-if="props.data.footer">
+                    <div class="separator-light">----------------------------------------</div>
+                    <div class="compact-center footer-text" t-esc="props.data.footer"/>
+                </t>
+
+                <!-- Order Info -->
+                <div class="separator-light">----------------------------------------</div>
+                <div class="compact-center small-text">
+                    <div t-esc="props.data.name"/>
+                    <div t-esc="props.data.date"/>
+                </div>
+
+                <!-- Shipping Date if applicable -->
+                <t t-if="props.data.shippingDate">
+                    <div class="compact-center small-text">
+                        Expected Delivery: <t t-esc="props.data.shippingDate"/>
+                    </div>
+                </t>
+
+                <!-- Thank You Message -->
+                <div class="compact-center thank-you">
+                    THANK YOU FOR YOUR BUSINESS!
+                </div>
+            </div>
+        </xpath>
+    </t>
+
+    <!-- Compact Receipt Header -->
+    <t t-name="labodega_pos.CompactReceiptHeader">
+        <div class="compact-header">
+            <!-- Store Logo -->
+            <t t-if="data.company.logo">
+                <div class="compact-center">
+                    <img t-attf-src="/web/image?model=res.company&amp;id={{data.company.id}}&amp;field=logo"
+                         alt="Logo" class="compact-logo"/>
+                </div>
+            </t>
+
+            <!-- Store Name -->
+            <div class="compact-center store-name" t-if="data.company.name">
+                <t t-esc="data.company.name"/>
+            </div>
+
+            <!-- Store Info - Compact -->
+            <div class="compact-center store-info">
+                <div t-if="data.company.phone">
+                    Tel: <t t-esc="data.company.phone"/>
+                </div>
+                <div t-if="data.company.email" t-esc="data.company.email"/>
+                <div t-if="data.company.vat">
+                    VAT: <t t-esc="data.company.vat"/>
+                </div>
+            </div>
+
+            <!-- Tracking Number -->
+            <t t-if="data.trackingNumber">
+                <div class="compact-center tracking-number">
+                    <t t-if="data.bigTrackingNumber">
+                        <div class="big-tracking" t-esc="data.trackingNumber"/>
+                    </t>
+                    <t t-else="">
+                        Order #<t t-esc="data.trackingNumber"/>
+                    </t>
+                </div>
+            </t>
+
+            <!-- Cashier -->
+            <t t-if="data.cashier">
+                <div class="compact-center cashier-info">
+                    Cashier: <t t-esc="data.cashier"/>
+                </div>
+            </t>
+
+            <!-- Custom Header -->
+            <t t-if="data.header">
+                <div class="compact-center custom-header" t-esc="data.header"/>
+            </t>
+        </div>
+    </t>
+
+    <!-- Compact Order Line -->
+    <t t-name="labodega_pos.CompactOrderline">
+        <div class="compact-orderline">
+            <!-- Product Name and Price -->
+            <div class="compact-line product-line">
+                <span class="product-name" t-esc="line.productName"/>
+                <span class="product-price" t-esc="line.price"/>
+            </div>
+
+            <!-- Quantity and Unit Price -->
+            <div class="compact-subline">
+                <span class="qty-info">
+                    <t t-esc="line.qty"/>
+                    <t t-if="line.unit"> <t t-esc="line.unit"/></t>
+                    <t t-if="line.unitPrice"> @ <t t-esc="line.unitPrice"/></t>
+                </span>
+                <t t-if="line.oldUnitPrice">
+                    <span class="original-price">
+                        Was: <t t-esc="line.oldUnitPrice"/>
+                    </span>
+                </t>
+            </div>
+
+            <!-- Discount Info -->
+            <t t-if="line.discount and line.discount !== '0'">
+                <div class="compact-subline discount-info">
+                    Discount: <t t-esc="line.discount"/>% OFF - Saved: <t t-esc="line.price_without_discount"/>
+                </div>
+            </t>
+
+            <!-- Customer Note -->
+            <t t-if="line.customerNote">
+                <div class="compact-subline customer-note">
+                    Note: <t t-esc="line.customerNote"/>
+                </div>
+            </t>
+
+            <!-- Lot/Serial Numbers -->
+            <t t-foreach="line.packLotLines || []" t-as="lot" t-key="lot_index">
+                <div class="compact-subline lot-info">
+                    S/N: <t t-esc="lot"/>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>
+

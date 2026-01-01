@@ -1,0 +1,336 @@
+/* ================================================
+   COMPACT RECEIPT STYLES - Walmart/Kroger Style
+   Minimal spacing, clean layout, easy to read
+   ================================================ */
+
+.compact-receipt {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 0;
+    margin: 0;
+    max-width: 80mm; /* Standard thermal printer width */
+    color: #000;
+    background: #fff;
+}
+
+/* =============== LAYOUT UTILITIES =============== */
+
+.compact-line {
+    display: flex;
+    justify-content: space-between;
+    margin: 1px 0;
+    padding: 0;
+}
+
+.compact-subline {
+    font-size: 10px;
+    margin: 0 0 1px 0;
+    padding: 0 0 0 4px;
+    color: #333;
+}
+
+.compact-center {
+    text-align: center;
+    margin: 1px 0;
+}
+
+.compact-label {
+    flex: 1;
+    text-align: left;
+}
+
+.compact-value {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* =============== SEPARATORS =============== */
+
+.separator {
+    text-align: center;
+    margin: 2px 0;
+    font-size: 9px;
+    letter-spacing: -0.5px;
+    line-height: 1;
+}
+
+.separator-light {
+    text-align: center;
+    margin: 1px 0;
+    font-size: 9px;
+    letter-spacing: -0.5px;
+    line-height: 1;
+}
+
+/* =============== HEADER =============== */
+
+.compact-header {
+    margin-bottom: 3px;
+}
+
+.compact-logo {
+    max-width: 40%;
+    height: auto;
+    margin: 2px auto;
+    display: block;
+}
+
+.store-name {
+    font-size: 14px;
+    font-weight: bold;
+    margin: 2px 0;
+    text-transform: uppercase;
+}
+
+.store-info {
+    font-size: 9px;
+    margin: 1px 0;
+    line-height: 1.3;
+}
+
+.tracking-number {
+    font-size: 12px;
+    font-weight: bold;
+    margin: 3px 0;
+}
+
+.big-tracking {
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.cashier-info {
+    font-size: 10px;
+    margin: 2px 0;
+}
+
+.custom-header {
+    font-size: 10px;
+    margin: 2px 0;
+    white-space: pre-line;
+}
+
+/* =============== ORDER LINES =============== */
+
+.compact-orderlines {
+    margin: 3px 0;
+}
+
+.compact-orderline {
+    margin: 3px 0;
+    padding: 0;
+}
+
+.product-line {
+    font-weight: normal;
+}
+
+.product-name {
+    flex: 1;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.product-price {
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.qty-info {
+    font-size: 10px;
+}
+
+.original-price {
+    font-size: 9px;
+    text-decoration: line-through;
+    color: #666;
+    margin-left: 4px;
+}
+
+.discount-info {
+    font-weight: bold;
+    color: #d00;
+}
+
+.customer-note {
+    font-style: italic;
+    color: #555;
+}
+
+.lot-info {
+    font-size: 9px;
+    font-family: monospace;
+}
+
+/* =============== TOTALS SECTION =============== */
+
+.tax-line {
+    font-size: 10px;
+}
+
+.total-line {
+    font-size: 12px;
+    margin: 2px 0;
+}
+
+.payment-line {
+    font-size: 11px;
+    margin: 1px 0;
+}
+
+.change-line {
+    font-size: 12px;
+    margin: 2px 0;
+}
+
+.savings-line {
+    font-size: 11px;
+    margin: 2px 0;
+    color: #d00;
+}
+
+/* =============== UTILITIES =============== */
+
+.bold {
+    font-weight: bold;
+}
+
+.uppercase {
+    text-transform: uppercase;
+}
+
+.small-text {
+    font-size: 9px;
+    line-height: 1.3;
+}
+
+/* =============== FOOTER =============== */
+
+.footer-text {
+    font-size: 10px;
+    margin: 2px 0;
+    white-space: pre-line;
+}
+
+.thank-you {
+    font-size: 12px;
+    font-weight: bold;
+    margin: 4px 0 2px 0;
+    text-transform: uppercase;
+}
+
+/* =============== QR CODE =============== */
+
+.compact-qr {
+    max-width: 120px;
+    height: auto;
+    margin: 3px auto;
+    display: block;
+}
+
+/* =============== PAYMENT TERMINAL =============== */
+
+.payment-terminal-receipt {
+    text-align: center;
+    margin: 2px 0;
+}
+
+.payment-terminal-receipt pre {
+    font-family: 'Courier New', monospace;
+    font-size: 9px;
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* =============== PRINT OPTIMIZATIONS =============== */
+
+@media print {
+    .compact-receipt {
+        font-size: 10px;
+        max-width: 80mm;
+        margin: 0;
+        padding: 2mm;
+    }
+
+    .separator,
+    .separator-light {
+        page-break-inside: avoid;
+    }
+
+    .compact-orderline {
+        page-break-inside: avoid;
+    }
+
+    /* Ensure black text on white background */
+    .compact-receipt,
+    .compact-receipt * {
+        color: #000 !important;
+        background: #fff !important;
+    }
+
+    /* Remove any shadows or borders */
+    .compact-receipt,
+    .compact-receipt * {
+        box-shadow: none !important;
+        border: none !important;
+    }
+}
+
+/* =============== RESPONSIVE ADJUSTMENTS =============== */
+
+@media screen and (max-width: 400px) {
+    .compact-receipt {
+        font-size: 10px;
+    }
+
+    .store-name {
+        font-size: 13px;
+    }
+
+    .total-line {
+        font-size: 11px;
+    }
+}
+
+/* =============== THERMAL PRINTER OPTIMIZATIONS =============== */
+
+/* For 58mm thermal printers */
+@media (max-width: 58mm) {
+    .compact-receipt {
+        font-size: 9px;
+    }
+
+    .compact-logo {
+        max-width: 35%;
+    }
+
+    .store-name {
+        font-size: 12px;
+    }
+}
+
+/* For 80mm thermal printers (most common) */
+@media (min-width: 58mm) and (max-width: 80mm) {
+    .compact-receipt {
+        font-size: 11px;
+        max-width: 80mm;
+    }
+}
+
+/* =============== DARK MODE OVERRIDE (for screen preview) =============== */
+
+@media (prefers-color-scheme: dark) {
+    .compact-receipt {
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .compact-receipt * {
+        color: #000 !important;
+    }
+}
+
