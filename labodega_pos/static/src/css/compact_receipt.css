@@ -1,7 +1,5 @@
-/* ===== Compact 80mm grocery receipt ===== */
-
 .pos-receipt.compact-receipt.compact80{
-  width: 72mm;              /* 80mm paper with margins */
+  width: 72mm;
   font-family: ui-monospace, "Courier New", monospace;
   font-size: 11px;
   line-height: 1.12;
@@ -11,7 +9,7 @@
   background: #fff;
 }
 
-/* Kill inherited spacing from bootstrap / odoo blocks */
+/* IMPORTANT: do NOT use margin-bottom on * (that creates negative space) */
 .pos-receipt.compact-receipt *{
   margin: 0;
   padding: 0;
@@ -25,26 +23,18 @@
   text-transform: uppercase;
   margin-bottom: 2px;
 }
-
 .pos-receipt.compact-receipt .h2{
   font-size: 10px;
   margin-bottom: 3px;
 }
-
 .pos-receipt.compact-receipt .meta{
   font-size: 10px;
   margin-bottom: 2px;
 }
-
 .pos-receipt.compact-receipt .meta-row{
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  margin: 0;
-}
-
-.pos-receipt.compact-receipt .meta-lbl{
-  font-weight: 700;
 }
 
 .pos-receipt.compact-receipt .sep{
@@ -53,57 +43,34 @@
   line-height: 1;
   margin: 2px 0;
 }
-
-.pos-receipt.compact-receipt .sep.thin{
-  margin: 1px 0;
-}
+.pos-receipt.compact-receipt .sep.thin{ margin: 1px 0; }
 
 .pos-receipt.compact-receipt .row{
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
+  display:flex;
+  justify-content:space-between;
+  gap:6px;
 }
 
 .pos-receipt.compact-receipt .left{
-  flex: 1 1 auto;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  flex:1 1 auto;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
 }
-
 .pos-receipt.compact-receipt .right{
-  flex: 0 0 auto;
-  white-space: nowrap;
+  flex:0 0 auto;
+  white-space:nowrap;
 }
 
-.pos-receipt.compact-receipt .lines .row.item{
-  margin: 1px 0;
-}
-
-.pos-receipt.compact-receipt .name{
-  text-transform: uppercase;
-}
-
-.pos-receipt.compact-receipt .qty{
-  font-weight: 700;
-}
+.pos-receipt.compact-receipt .lines .row.item{ margin: 1px 0; }
+.pos-receipt.compact-receipt .name{ text-transform: uppercase; }
+.pos-receipt.compact-receipt .qty{ font-weight: 800; }
 
 .pos-receipt.compact-receipt .sub{
   font-size: 10px;
   opacity: 0.9;
-  margin: 0 0 1px 2px; /* tiny indent only */
+  margin: 0 0 1px 2px;
   white-space: nowrap;
-}
-
-.pos-receipt.compact-receipt .note{
-  font-size: 10px;
-  font-style: italic;
-  margin: 0 0 1px 0;
-  white-space: normal;
-}
-
-.pos-receipt.compact-receipt .totals{
-  margin-top: 1px;
 }
 
 .pos-receipt.compact-receipt .row.grand{
@@ -112,15 +79,7 @@
   margin-top: 1px;
 }
 
-.pos-receipt.compact-receipt .row.savings{
-  font-weight: 800;
-}
-
-.pos-receipt.compact-receipt .terminal{
-  margin: 1px 0 2px 0;
-  text-align: center;
-}
-
+.pos-receipt.compact-receipt .terminal{ margin: 1px 0 2px 0; text-align:center; }
 .pos-receipt.compact-receipt .terminal pre{
   font-family: ui-monospace, "Courier New", monospace;
   font-size: 9px;
@@ -128,30 +87,10 @@
   word-break: break-word;
 }
 
-.pos-receipt.compact-receipt .footer-text{
-  font-size: 10px;
-  margin-top: 3px;
-  white-space: pre-line;
-  text-align: center;
-}
+.pos-receipt.compact-receipt .footer{ margin-top: 4px; text-align:center; }
+.pos-receipt.compact-receipt .thanks{ font-weight: 900; margin-bottom: 1px; }
+.pos-receipt.compact-receipt .small{ font-size: 9px; }
 
-.pos-receipt.compact-receipt .footer{
-  margin-top: 4px;
-  text-align: center;
-}
-
-.pos-receipt.compact-receipt .thanks{
-  font-weight: 900;
-  margin-bottom: 1px;
-}
-
-.pos-receipt.compact-receipt .small{
-  font-size: 9px;
-}
-
-/* print safety */
 @media print {
-  .pos-receipt.compact-receipt.compact80{
-    padding: 2mm;
-  }
+  .pos-receipt.compact-receipt.compact80{ padding: 2mm; }
 }
