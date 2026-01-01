@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <!-- Simplified Compact Receipt - Inherits and modifies default -->
+    <t t-name="labodega_pos.CompactOrderReceipt" t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+
+        <!-- Add compact-receipt class to main div -->
+        <xpath expr="//div[hasclass('pos-receipt')]" position="attributes">
+            <attribute name="class">pos-receipt compact-receipt</attribute>
+        </xpath>
+
+        <!-- Remove excessive padding -->
+        <xpath expr="//div[hasclass('pos-receipt')]" position="attributes">
+            <attribute name="class">pos-receipt p-0</attribute>
+        </xpath>
+
+    </t>
+
+</templates>
+

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
     <!-- Compact Walmart/Kroger Style Receipt -->
-    <t t-name="labodega_pos.CompactOrderReceipt" t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="primary">
-        <!-- Override the entire receipt structure for compact layout -->
-        <xpath expr="//div[@class='pos-receipt p-2']" position="replace">
+    <t t-name="labodega_pos.CompactOrderReceipt">
+        <!-- Compact receipt structure -->
+        <xpath expr="//div[hasclass('pos-receipt')]" position="replace">
             <div class="pos-receipt compact-receipt">
                 <!-- Compact Header -->
                 <t t-call="labodega_pos.CompactReceiptHeader">
