@@ -4,7 +4,7 @@
   <!-- FORCE REPLACE the real POS receipt template -->
   <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="replace" owl="1">
 
-    <div class="pos-receipt compact-receipt compact80">
+    <div class="pos-receipt compact-receipt compact80" t-ref="receipt">
 
       <!-- ===== HEADER ===== -->
       <div class="h1" t-esc="props.data.headerData.company.name"/>
