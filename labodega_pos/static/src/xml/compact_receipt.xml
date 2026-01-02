@@ -8,6 +8,11 @@
     <xpath expr="//div[hasclass('pos-receipt')]" position="replace">
       <div class="pos-receipt compact-receipt compact80">
 
+        <!-- ===== LOGO ===== -->
+        <div class="text-center">
+          <img t-attf-src="/web/image?model=res.company&amp;id={{props.data.headerData.company.id}}&amp;field=logo" alt="Logo" class="pos-receipt-logo compact-logo"/>
+        </div>
+
         <!-- ===== HEADER ===== -->
         <div class="h1" t-esc="props.data.headerData.company.name"/>
         <div class="h2">
@@ -45,9 +50,9 @@
         <div class="lines">
           <t t-foreach="props.data.orderlines or []" t-as="line" t-key="line_index">
 
-            <!-- Main line (always single row) -->
-            <div class="row item">
-              <div class="left">
+            <!-- Main line - flex layout for horizontal alignment -->
+            <div class="row item d-flex justify-content-between align-items-start">
+              <div class="left flex-grow-1">
                 <span class="name" t-esc="line.productName"/>
                 <t t-if="line.qty != '1.00'">
                   <span class="qty"> x<t t-esc="line.qty"/></span>
@@ -55,7 +60,7 @@
               </div>
 
               <!-- Use already-formatted price from orderline -->
-              <div class="right" t-esc="line.price"/>
+              <div class="right text-end ms-2" t-esc="line.price"/>
             </div>
 
             <!-- Subline ONLY when qty > 1 -->
