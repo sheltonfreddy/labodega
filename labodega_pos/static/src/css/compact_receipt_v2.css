@@ -1,0 +1,269 @@
+/* ================================================
+   COMPACT RECEIPT STYLES - Ultra Compact Version
+   Walmart/Kroger Style - Maximum space efficiency
+   ================================================ */
+
+/* =============== BASE RECEIPT =============== */
+
+.compact-receipt {
+    font-family: 'Courier New', 'Consolas', monospace !important;
+    font-size: 11px !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    max-width: 80mm !important;
+    color: #000 !important;
+    background: #fff !important;
+}
+
+.compact80 {
+    max-width: 80mm !important;
+    width: 100%;
+}
+
+/* =============== HEADER =============== */
+
+.compact-receipt .h1 {
+    font-size: 14px !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    margin: 2px 0 !important;
+    text-transform: uppercase !important;
+    line-height: 1.2 !important;
+}
+
+.compact-receipt .h2 {
+    font-size: 10px !important;
+    text-align: center !important;
+    margin: 1px 0 !important;
+    line-height: 1.3 !important;
+}
+
+/* =============== META INFO =============== */
+
+.compact-receipt .meta {
+    margin: 3px 0 !important;
+}
+
+.compact-receipt .meta-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+    margin: 1px 0 !important;
+}
+
+.compact-receipt .meta-lbl {
+    font-weight: normal !important;
+}
+
+.compact-receipt .meta-val {
+    font-weight: normal !important;
+}
+
+/* =============== SEPARATORS =============== */
+
+.compact-receipt .sep {
+    text-align: center !important;
+    font-size: 9px !important;
+    line-height: 1 !important;
+    margin: 2px 0 !important;
+    letter-spacing: -0.5px !important;
+}
+
+.compact-receipt .sep.thin {
+    margin: 1px 0 !important;
+}
+
+/* =============== ORDER LINES =============== */
+
+.compact-receipt .lines {
+    margin: 2px 0 !important;
+}
+
+.compact-receipt .row {
+    display: flex !important;
+    justify-content: space-between !important;
+    line-height: 1.2 !important;
+    margin: 1px 0 !important;
+}
+
+.compact-receipt .row.item {
+    font-size: 11px !important;
+    margin: 2px 0 !important;
+}
+
+.compact-receipt .row .left {
+    flex: 1 !important;
+    text-align: left !important;
+    padding-right: 4px !important;
+}
+
+.compact-receipt .row .right {
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-weight: bold !important;
+}
+
+.compact-receipt .name {
+    font-weight: normal !important;
+    text-transform: uppercase !important;
+}
+
+.compact-receipt .qty {
+    font-weight: bold !important;
+    font-size: 10px !important;
+}
+
+/* Subline (qty @ price) */
+.compact-receipt .sub {
+    font-size: 9px !important;
+    margin: 0 0 1px 8px !important;
+    color: #333 !important;
+    line-height: 1.2 !important;
+}
+
+/* Customer note */
+.compact-receipt .note {
+    font-size: 9px !important;
+    font-style: italic !important;
+    margin: 0 0 2px 8px !important;
+    color: #555 !important;
+}
+
+/* =============== TOTALS =============== */
+
+.compact-receipt .totals {
+    margin: 2px 0 !important;
+}
+
+.compact-receipt .totals .row {
+    font-size: 11px !important;
+}
+
+.compact-receipt .row.grand {
+    font-size: 12px !important;
+    font-weight: bold !important;
+    margin: 2px 0 !important;
+}
+
+.compact-receipt .row.grand .left,
+.compact-receipt .row.grand .right {
+    font-weight: bold !important;
+}
+
+/* =============== PAYMENT =============== */
+
+.compact-receipt .terminal {
+    margin: 2px 0 !important;
+    text-align: center !important;
+}
+
+.compact-receipt .terminal pre {
+    font-family: 'Courier New', monospace !important;
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: pre-wrap !important;
+}
+
+/* =============== FOOTER =============== */
+
+.compact-receipt .footer-text {
+    text-align: center !important;
+    font-size: 10px !important;
+    margin: 3px 0 !important;
+    white-space: pre-line !important;
+}
+
+.compact-receipt .footer {
+    text-align: center !important;
+    margin: 4px 0 2px 0 !important;
+}
+
+.compact-receipt .thanks {
+    font-size: 12px !important;
+    font-weight: bold !important;
+    margin: 2px 0 !important;
+}
+
+.compact-receipt .small {
+    font-size: 9px !important;
+    margin: 1px 0 !important;
+    color: #666 !important;
+}
+
+/* =============== REMOVE DEFAULT BOOTSTRAP/ODOO PADDING =============== */
+
+.compact-receipt.p-2 {
+    padding: 0 !important;
+}
+
+.compact-receipt * {
+    box-sizing: border-box !important;
+}
+
+.compact-receipt br {
+    line-height: 0.5 !important;
+    margin: 0 !important;
+}
+
+/* =============== PRINT OPTIMIZATIONS =============== */
+
+@media print {
+    .compact-receipt {
+        font-size: 10px !important;
+        max-width: 80mm !important;
+        margin: 0 !important;
+        padding: 2mm !important;
+    }
+
+    .compact-receipt,
+    .compact-receipt * {
+        color: #000 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    .compact-receipt .sep,
+    .compact-receipt .row {
+        page-break-inside: avoid !important;
+    }
+}
+
+/* =============== THERMAL PRINTER (58mm) =============== */
+
+@media (max-width: 58mm) {
+    .compact-receipt {
+        font-size: 9px !important;
+    }
+
+    .compact-receipt .h1 {
+        font-size: 12px !important;
+    }
+
+    .compact-receipt .row.grand {
+        font-size: 11px !important;
+    }
+}
+
+/* =============== DARK MODE OVERRIDE =============== */
+
+@media (prefers-color-scheme: dark) {
+    .compact-receipt,
+    .compact-receipt * {
+        background: #fff !important;
+        color: #000 !important;
+    }
+}
+
+/* =============== RESPONSIVE =============== */
+
+@media screen and (max-width: 400px) {
+    .compact-receipt {
+        font-size: 10px !important;
+    }
+}
+
