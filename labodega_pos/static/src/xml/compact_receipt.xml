@@ -51,8 +51,10 @@
                 <span class="qty"> x<t t-esc="l.quantity"/></span>
               </t>
             </div>
+
+            <!-- IMPORTANT: do NOT call formatCurrency on display strings -->
             <div class="right">
-              <t t-esc="l.price_with_tax or l.price_display or props.formatCurrency(l.price)"/>
+              <t t-esc="l.price_with_tax or l.price_display or l.price_subtotal_incl or l.price_subtotal"/>
             </div>
           </div>
 
@@ -60,7 +62,7 @@
           <t t-if="l.quantity != 1">
             <div class="sub">
               <span t-esc="l.quantity"/> @
-              <span t-esc="l.price_unit_display or props.formatCurrency(l.price_unit)"/>
+              <span t-esc="l.price_unit_display or l.unit_price or l.price_unit"/>
             </div>
           </t>
 
@@ -80,7 +82,7 @@
           <div class="right" t-esc="props.data.total_without_tax"/>
         </div>
 
-        <!-- Keep tax compact (you can collapse later if desired) -->
+        <!-- Taxes: these currency fields are usually numeric => formatCurrency is OK -->
         <t t-if="props.data.taxTotals and props.data.taxTotals.has_tax_groups">
           <t t-foreach="props.data.taxTotals.subtotals" t-as="st" t-key="st.name">
             <t t-foreach="st.tax_groups" t-as="tg" t-key="tg.id">
@@ -104,7 +106,8 @@
           <t t-foreach="props.data.paymentlines" t-as="p" t-key="p.uuid or p.name">
             <div class="row">
               <div class="left" t-esc="p.name"/>
-              <div class="right" t-esc="props.formatCurrency(p.amount)"/>
+              <!-- Safer: payment line amount is often already formatted. -->
+              <div class="right" t-esc="p.amount"/>
             </div>
 
             <t t-if="p.ticket">
@@ -118,21 +121,12 @@
         <t t-if="props.data.show_change">
           <div class="row">
             <div class="left"><t t-esc="props.data.label_change"/></div>
-            <div class="right" t-esc="props.formatCurrency(props.data.order_change)"/>
+            <!-- Safer: change is often already formatted -->
+            <div class="right" t-esc="props.data.order_change"/>
           </div>
         </t>
       </div>
 
       <t t-if="props.data.footer">
         <div class="footer-text" t-esc="props.data.footer"/>
-      </t>
-
-      <div class="footer">
-        <div class="thanks">THANK YOU!</div>
-        <div class="small">Powered by Odoo</div>
-      </div>
-
-    </div>
-  </t>
-
-</templates>
+      </
