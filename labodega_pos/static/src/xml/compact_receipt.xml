@@ -8,23 +8,21 @@
     <xpath expr="//div[hasclass('pos-receipt')]" position="replace">
       <div class="pos-receipt compact-receipt compact80">
 
-        <!-- ===== LOGO ===== -->
-        <div class="text-center">
+        <!-- ===== LOGO ONLY (remove duplicate company name) ===== -->
+        <div class="text-center logo-section">
           <img t-attf-src="/web/image?model=res.company&amp;id={{props.data.headerData.company.id}}&amp;field=logo" alt="Logo" class="pos-receipt-logo compact-logo"/>
         </div>
 
-        <!-- ===== HEADER ===== -->
-        <div class="h1" t-esc="props.data.headerData.company.name"/>
-        <div class="h2">
+        <!-- ===== HEADER (company info without name) ===== -->
+        <div class="h2 company-info">
           <t t-if="props.data.headerData.company.street">
-            <span t-esc="props.data.headerData.company.street"/>
+            <div t-esc="props.data.headerData.company.street"/>
           </t>
           <t t-if="props.data.headerData.company.city">
-            <span t-if="props.data.headerData.company.street">, </span>
-            <span t-esc="props.data.headerData.company.city"/>
+            <div t-esc="props.data.headerData.company.city"/>
           </t>
           <t t-if="props.data.headerData.company.phone">
-            <span> • </span><span t-esc="props.data.headerData.company.phone"/>
+            <div>Tel: <t t-esc="props.data.headerData.company.phone"/></div>
           </t>
         </div>
 
