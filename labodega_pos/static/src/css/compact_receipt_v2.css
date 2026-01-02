@@ -124,6 +124,55 @@
     width: 100% !important;
 }
 
+/* Table-based layout for perfect alignment */
+.compact-receipt .orderline-row {
+    margin: 2px 0 !important;
+    width: 100% !important;
+}
+
+.compact-receipt .orderline-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    table-layout: fixed !important;
+}
+
+.compact-receipt .orderline-table tr {
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.compact-receipt .orderline-table td {
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    vertical-align: top !important;
+    line-height: 1.2 !important;
+}
+
+.compact-receipt .product-name-cell {
+    text-align: left !important;
+    width: auto !important;
+    padding-right: 8px !important;
+    font-size: 11px !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+}
+
+.compact-receipt .price-cell {
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-weight: bold !important;
+    font-size: 11px !important;
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+}
+
+/* Legacy row classes (keep for backward compatibility) */
 .compact-receipt .row {
     display: flex !important;
     justify-content: space-between !important;
@@ -223,8 +272,64 @@
 
 .compact-receipt .totals {
     margin: 2px 0 !important;
+    width: 100% !important;
 }
 
+/* Totals table for perfect alignment */
+.compact-receipt .totals-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    table-layout: fixed !important;
+}
+
+.compact-receipt .totals-table tr {
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.compact-receipt .totals-table td {
+    border: none !important;
+    margin: 0 !important;
+    padding: 1px 0 !important;
+    vertical-align: top !important;
+    line-height: 1.2 !important;
+    font-size: 11px !important;
+}
+
+.compact-receipt .label-cell {
+    text-align: left !important;
+    width: auto !important;
+    padding-right: 8px !important;
+}
+
+.compact-receipt .amount-cell {
+    text-align: right !important;
+    white-space: nowrap !important;
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+}
+
+/* Total row styling */
+.compact-receipt .total-row td {
+    font-weight: bold !important;
+    font-size: 12px !important;
+    padding: 2px 0 !important;
+}
+
+.compact-receipt .total-label {
+    font-weight: bold !important;
+}
+
+.compact-receipt .total-amount {
+    font-weight: bold !important;
+}
+
+/* Legacy row classes for totals (keep for backward compatibility) */
 .compact-receipt .totals .row {
     font-size: 11px !important;
 }

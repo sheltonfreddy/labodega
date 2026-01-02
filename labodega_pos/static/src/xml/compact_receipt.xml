@@ -48,17 +48,19 @@
         <div class="lines">
           <t t-foreach="props.data.orderlines or []" t-as="line" t-key="line_index">
 
-            <!-- Main line - flex layout for horizontal alignment -->
-            <div class="row item d-flex justify-content-between align-items-start">
-              <div class="left flex-grow-1">
-                <span class="name" t-esc="line.productName"/>
-                <t t-if="line.qty != '1.00'">
-                  <span class="qty"> x<t t-esc="line.qty"/></span>
-                </t>
-              </div>
-
-              <!-- Use already-formatted price from orderline -->
-              <div class="right text-end ms-2" t-esc="line.price"/>
+            <!-- Main line - using table-style layout for perfect alignment -->
+            <div class="orderline-row">
+              <table class="orderline-table">
+                <tr>
+                  <td class="product-name-cell">
+                    <span class="name" t-esc="line.productName"/>
+                    <t t-if="line.qty != '1.00'">
+                      <span class="qty"> x<t t-esc="line.qty"/></span>
+                    </t>
+                  </td>
+                  <td class="price-cell" t-esc="line.price"/>
+                </tr>
+              </table>
             </div>
 
             <!-- Subline ONLY when qty > 1 -->
@@ -82,38 +84,46 @@
           <div class="totals">
             <t t-set="taxTotals" t-value="props.data.taxTotals"/>
 
-            <div class="row">
-              <div class="left">Subtotal</div>
-              <div class="right" t-esc="props.formatCurrency(taxTotals.subtotals?.[0]?.base_amount_currency or 0)"/>
-            </div>
+            <table class="totals-table">
+              <tr>
+                <td class="label-cell">Subtotal</td>
+                <td class="amount-cell" t-esc="props.formatCurrency(taxTotals.subtotals?.[0]?.base_amount_currency or 0)"/>
+              </tr>
 
-            <!-- Taxes -->
-            <t t-if="taxTotals and taxTotals.has_tax_groups">
-              <t t-foreach="taxTotals.subtotals" t-as="subtotal" t-key="subtotal.name">
-                <t t-foreach="subtotal.tax_groups" t-as="tax_group" t-key="tax_group.id">
-                  <div class="row">
-                    <div class="left" t-esc="tax_group.group_name"/>
-                    <div class="right" t-esc="props.formatCurrency(tax_group.tax_amount_currency)"/>
-                  </div>
+              <!-- Taxes -->
+              <t t-if="taxTotals and taxTotals.has_tax_groups">
+                <t t-foreach="taxTotals.subtotals" t-as="subtotal" t-key="subtotal.name">
+                  <t t-foreach="subtotal.tax_groups" t-as="tax_group" t-key="tax_group.id">
+                    <tr>
+                      <td class="label-cell" t-esc="tax_group.group_name"/>
+                      <td class="amount-cell" t-esc="props.formatCurrency(tax_group.tax_amount_currency)"/>
+                    </tr>
+                  </t>
                 </t>
               </t>
-            </t>
+            </table>
 
             <div class="sep thin">------------------------------------------</div>
 
-            <div class="row grand">
-              <div class="left">TOTAL</div>
-              <div class="right" t-esc="props.formatCurrency(taxTotals.order_sign * taxTotals.order_total)"/>
-            </div>
+            <table class="totals-table">
+              <tr class="total-row">
+                <td class="label-cell total-label">TOTAL</td>
+                <td class="amount-cell total-amount" t-esc="props.formatCurrency(taxTotals.order_sign * taxTotals.order_total)"/>
+              </tr>
+            </table>
 
             <t t-if="props.data.paymentlines?.length">
               <div class="sep thin">------------------------------------------</div>
-              <t t-foreach="props.data.paymentlines" t-as="line" t-key="line_index">
-                <div class="row">
-                  <div class="left" t-esc="line.name"/>
-                  <div class="right" t-esc="props.formatCurrency(line.amount)"/>
-                </div>
+              <table class="totals-table">
+                <t t-foreach="props.data.paymentlines" t-as="line" t-key="line_index">
+                  <tr>
+                    <td class="label-cell" t-esc="line.name"/>
+                    <td class="amount-cell" t-esc="props.formatCurrency(line.amount)"/>
+                  </tr>
+                </t>
+              </table>
 
+              <t t-foreach="props.data.paymentlines" t-as="line" t-key="line_index">
                 <t t-if="line.ticket">
                   <div class="terminal">
                     <pre t-esc="line.ticket"/>
@@ -123,10 +133,12 @@
             </t>
 
             <t t-if="props.data.change">
-              <div class="row">
-                <div class="left">Change</div>
-                <div class="right" t-esc="props.formatCurrency(props.data.change)"/>
-              </div>
+              <table class="totals-table">
+                <tr>
+                  <td class="label-cell">Change</td>
+                  <td class="amount-cell" t-esc="props.formatCurrency(props.data.change)"/>
+                </tr>
+              </table>
             </t>
           </div>
 
