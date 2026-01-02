@@ -1,0 +1,35 @@
+/* ================================================
+   POS Navbar Logo Customization
+   ================================================ */
+
+/* La Bodega company logo in POS navbar */
+.labodega-logo {
+    max-height: 50px !important;
+    height: auto !important;
+    width: auto !important;
+    max-width: 150px !important;
+    object-fit: contain !important;
+    cursor: pointer !important;
+    display: block !important;
+}
+
+/* Ensure logo is centered */
+.pos-centerheader {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .labodega-logo {
+        max-height: 40px !important;
+        max-width: 120px !important;
+    }
+}
+
+/* Remove default Odoo logo styling if needed */
+.pos-logo[src="/web/static/img/logo.png"] {
+    display: none !important;
+}
+
