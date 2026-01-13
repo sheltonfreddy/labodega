@@ -7,8 +7,9 @@ Runs on Raspberry Pi connected to Magellan scanner/scale via serial port
 import serial
 import threading
 import time
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import uvicorn
 
 # ============================================================================
@@ -50,6 +51,22 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+# Add Private Network Access (PNA) headers for Chrome compliance
+@app.middleware("http")
+async def add_private_network_access_headers(request: Request, call_next):
+    """
+    Add Private Network Access headers required by Chrome for local network requests.
+    This allows HTTPS sites to make requests to local IP addresses.
+    """
+    response = await call_next(request)
+
+    # Add Access-Control-Allow-Private-Network header for preflight requests
+    if request.method == "OPTIONS":
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+
+    return response
 
 # Separate locks: one for serial hardware, one for shared barcode state
 serial_lock = threading.Lock()

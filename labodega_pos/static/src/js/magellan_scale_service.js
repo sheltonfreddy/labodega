@@ -74,6 +74,7 @@ async function startBarcodePolling(pos) {
                     'Accept': 'application/json',
                 },
                 signal: AbortSignal.timeout(5000), // 5 second timeout
+                targetAddressSpace: 'private', // Chrome Private Network Access requirement
             });
 
             if (!response.ok) {
@@ -241,6 +242,7 @@ const magellanBarcodeReaderService = {
                                             'Accept': 'application/json',
                                         },
                                         signal: AbortSignal.timeout(3000), // 3 second timeout
+                                        targetAddressSpace: 'private', // Chrome Private Network Access requirement
                                     });
 
                                     if (!response.ok) {
@@ -344,6 +346,7 @@ const magellanBarcodeReaderService = {
                             method: 'GET',
                             headers: { 'Accept': 'application/json' },
                             signal: AbortSignal.timeout(3000),
+                            targetAddressSpace: 'private', // Chrome Private Network Access requirement
                         });
 
                         if (response.ok) {
@@ -414,6 +417,7 @@ const magellanBarcodeReaderService = {
                             method: 'GET',
                             headers: { 'Accept': 'application/json' },
                             signal: AbortSignal.timeout(3000),
+                            targetAddressSpace: 'private', // Chrome Private Network Access requirement
                         });
 
                         if (response.ok) {
