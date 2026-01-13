@@ -48,7 +48,7 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["GET", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["*", "Access-Control-Request-Private-Network"],  # Include PNA header
     expose_headers=["*"],
 )
 
@@ -59,12 +59,29 @@ async def add_private_network_access_headers(request: Request, call_next):
     """
     Add Private Network Access headers required by Chrome for local network requests.
     This allows HTTPS sites to make requests to local IP addresses.
+
+    Chrome's Private Network Access requires:
+    1. Preflight OPTIONS request with Access-Control-Request-Private-Network
+    2. Server responds with Access-Control-Allow-Private-Network: true
     """
+    # Check if this is a PNA preflight request
+    if request.method == "OPTIONS" and "access-control-request-private-network" in request.headers:
+        # Respond to PNA preflight
+        return JSONResponse(
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Private-Network": "true",
+            }
+        )
+
+    # Process the actual request
     response = await call_next(request)
 
-    # Add Access-Control-Allow-Private-Network header for preflight requests
-    if request.method == "OPTIONS":
-        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    # Always add the PNA header to responses
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
 
     return response
 
