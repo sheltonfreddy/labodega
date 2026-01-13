@@ -1,10 +1,9 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { BRIDGE_CONFIG } from "./magellan_config";
+import { BRIDGE_CONFIG, getBridgeUrl } from "./magellan_config";
 
 console.log("[Magellan] magellan_scale_service.js loaded (DIRECT browser → Pi)");
-console.log("[Magellan] Pi bridge URL:", BRIDGE_CONFIG.BRIDGE_URL);
 console.log("[Magellan] Direct LAN communication (browser → Pi) - NO TAILSCALE");
 
 // Polling control state
@@ -13,14 +12,14 @@ let pollingController = null;
 let lastScanTime = 0;
 const SCAN_DEBOUNCE_MS = 500; // Prevent duplicate scans within 500ms
 
-async function startBarcodePolling() {
+async function startBarcodePolling(pos) {
     // wait until the barcodeReader service has been exposed
     while (!window.magellanBarcodeReader) {
         console.log("[Magellan] Waiting for magellanBarcodeReader...");
         await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    const bridgeUrl = BRIDGE_CONFIG.BRIDGE_URL;
+    const bridgeUrl = getBridgeUrl(pos);
     console.log("[Magellan] Starting OPTIMIZED barcode polling from Pi:", bridgeUrl);
     console.log("[Magellan] Browser → Pi (same LAN) - with dynamic intervals");
 
@@ -131,6 +130,8 @@ async function startBarcodePolling() {
 }
 
 // Expose control functions globally
+let globalPosInstance = null;
+
 window.magellanPollingControl = {
     pause: () => {
         pollingActive = false;
@@ -140,7 +141,7 @@ window.magellanPollingControl = {
         if (!pollingActive) {
             pollingActive = true;
             console.log("[Magellan] Polling resumed");
-            startBarcodePolling().catch(err => console.error("[Magellan] Resume error:", err));
+            startBarcodePolling(globalPosInstance).catch(err => console.error("[Magellan] Resume error:", err));
         }
     },
     isActive: () => pollingActive
@@ -159,6 +160,9 @@ const magellanBarcodeReaderService = {
         );
 
         const barcodeReader = barcode_reader;
+
+        // Store pos instance for polling control
+        globalPosInstance = pos;
 
         // expose for polling code
         window.magellanBarcodeReader = barcodeReader;
@@ -229,7 +233,7 @@ const magellanBarcodeReaderService = {
                                 let weight = null;
                                 try {
                                     // Direct fetch to Pi (browser and Pi on same LAN)
-                                    const piWeightUrl = `${BRIDGE_CONFIG.BRIDGE_URL}/weight`;
+                                    const piWeightUrl = `${getBridgeUrl(globalPosInstance)}/weight`;
 
                                     const response = await fetch(piWeightUrl, {
                                         method: 'GET',
@@ -333,7 +337,7 @@ const magellanBarcodeReaderService = {
                     // Manual selection - need to fetch weight from scale
                     let weight = null;
                     try {
-                        const piWeightUrl = `${BRIDGE_CONFIG.BRIDGE_URL}/weight`;
+                        const piWeightUrl = `${getBridgeUrl(globalPosInstance)}/weight`;
                         console.log("[Magellan] 🌐 Fetching weight for manual selection...");
 
                         const response = await fetch(piWeightUrl, {
@@ -403,7 +407,7 @@ const magellanBarcodeReaderService = {
                     // Fetch weight from scale for manual selection
                     let weight = null;
                     try {
-                        const piWeightUrl = `${BRIDGE_CONFIG.BRIDGE_URL}/weight`;
+                        const piWeightUrl = `${getBridgeUrl(globalPosInstance)}/weight`;
                         console.log("[Magellan] 🌐 Fetching weight for manual selection...");
 
                         const response = await fetch(piWeightUrl, {
@@ -458,7 +462,7 @@ const magellanBarcodeReaderService = {
         }
 
         // kick off barcode polling loop (once)
-        startBarcodePolling().catch((err) => {
+        startBarcodePolling(pos).catch((err) => {
             console.error("[Magellan] Error starting polling:", err);
         });
 

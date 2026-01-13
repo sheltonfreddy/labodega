@@ -3,20 +3,17 @@
 /**
  * Configuration for Magellan Scale Scanner Bridge
  *
- * Update BRIDGE_URL to point to your Raspberry Pi if it's not on localhost
+ * Multi-Terminal Setup:
+ * - Each POS Config can have its own magellan_bridge_url
+ * - Set the URL in Point of Sale → Configuration → Point of Sale
+ * - The BRIDGE_URL below is only used as a fallback if not configured
  */
 
 export const BRIDGE_CONFIG = {
-    // Bridge server URL - Browser talks DIRECTLY to Pi via HTTPS (not through Odoo server)
-    //
-    // IMPORTANT: This connection happens in the browser, on your LOCAL network
-    // The browser must be on the same LAN as the Raspberry Pi (10.0.0.x network)
-    //
-    // Using HTTPS to avoid mixed content warnings on HTTPS Odoo site
-    // First time: You may need to accept the self-signed certificate by visiting
-    // https://10.0.0.35:8000 directly in your browser
-    //BRIDGE_URL: "https://172.16.19.185:8000",
+    // Fallback Bridge URL (used if not set in POS Config)
+    // Each terminal should have its own bridge URL configured in pos.config
     BRIDGE_URL: "https://10.0.0.34:8000",
+
     // Lower = more responsive but more CPU/network usage
     BARCODE_POLL_INTERVAL: 200,
 
@@ -29,4 +26,21 @@ export const BRIDGE_CONFIG = {
     // Log verbosity (set to false in production)
     VERBOSE_LOGGING: true,
 };
+
+/**
+ * Get the bridge URL from POS config or fallback to default
+ * @param {Object} pos - The POS instance
+ * @returns {string} Bridge URL
+ */
+export function getBridgeUrl(pos) {
+    const configUrl = pos?.config?.magellan_bridge_url;
+    const url = configUrl || BRIDGE_CONFIG.BRIDGE_URL;
+
+    if (BRIDGE_CONFIG.VERBOSE_LOGGING) {
+        console.log(`[Magellan] Using bridge URL: ${url}`,
+            configUrl ? '(from POS config)' : '(fallback default)');
+    }
+
+    return url;
+}
 

@@ -13,14 +13,20 @@
                             <label for="magellan_bridge_url" class="col-lg-4 o_light_label"/>
                             <field name="magellan_bridge_url"
                                    class="col-lg-8"
-                                   placeholder="http://100.101.102.103:8000"/>
+                                   placeholder="https://10.0.0.34:8000"/>
                         </div>
                         <div class="row mt-2">
                             <div class="col-12 text-muted">
                                 <small>
-                                    <i class="fa fa-info-circle"/> Enter the Tailscale IP of the Raspberry Pi bridge for this terminal.<br/>
-                                    Example: http://100.101.102.103:8000<br/>
-                                    Leave empty to use system-wide default.
+                                    <i class="fa fa-info-circle"/> Enter the URL of the Raspberry Pi bridge for this terminal.<br/>
+                                    <strong>Format:</strong> https://[IP_ADDRESS]:8000<br/>
+                                    <strong>Examples:</strong><br/>
+                                    • Home network: https://10.0.0.34:8000<br/>
+                                    • Store network: https://172.16.19.185:8000<br/>
+                                    • Tailscale: https://100.101.102.103:8000<br/>
+                                    <br/>
+                                    <strong>Multi-Terminal Setup:</strong> Each POS terminal can have its own scale/scanner.<br/>
+                                    Leave empty to use the fallback default configured in the module.
                                 </small>
                             </div>
                         </div>
