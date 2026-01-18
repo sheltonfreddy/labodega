@@ -153,6 +153,9 @@ def clean_magellan_barcode(barcode: str) -> str:
         'S08',   # Alternate prefix
         'S09',   # Another variant
         'S0A',   # Short variant
+        'F',  # EAN/UPC symbology identifier
+        'E',  # Another EAN variant
+        'A',  # UPC-A identifier
     ]
 
     for prefix in prefixes:
