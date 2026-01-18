@@ -2,11 +2,15 @@
 """
 Magellan Scale Scanner Bridge for Odoo POS
 Runs on Raspberry Pi connected to Magellan scanner/scale via serial port
+Also handles receipt printing to Epson printer
 """
 
 import serial
 import threading
 import time
+import subprocess
+import tempfile
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -26,6 +30,10 @@ WEIGHT_DIVISOR = 100            # Divide raw weight value by this (100 or 1000)
 # HTTP Server settings
 SERVER_HOST = "0.0.0.0"        # Listen on all interfaces
 SERVER_PORT = 8000              # Port for the HTTP API
+
+# Printer settings
+PRINTER_NAME = "epson_pos"      # CUPS printer name (check with: lpstat -p)
+CASH_DRAWER_OPEN_CMD = b'\x1b\x70\x00\x19\x19'  # ESC/POS command to open cash drawer
 
 # ============================================================================
 # Application Code
@@ -47,7 +55,7 @@ app.add_middleware(
         "*"  # Allow all origins (remove in production if needed)
     ],
     allow_credentials=True,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Added POST for printing
     allow_headers=["*", "Access-Control-Request-Private-Network"],  # Include PNA header
     expose_headers=["*"],
 )
@@ -71,7 +79,7 @@ async def add_private_network_access_headers(request: Request, call_next):
             content={},
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",  # Added POST for printing
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Private-Network": "true",
             }
@@ -297,6 +305,268 @@ def get_weight():
         return {"weight": None, "error": error_msg}
 
 
+# ============================================================================
+# Printer Endpoints
+# ============================================================================
+
+@app.post("/print_raw")
+async def print_raw(request: Request):
+    """
+    Print raw ESC/POS data to the receipt printer.
+
+    Request body: Raw binary data (ESC/POS commands)
+    Response: {"status": "printed"} or {"status": "error", "message": "..."}
+    """
+    try:
+        data = await request.body()
+
+        if not data:
+            return {"status": "error", "message": "No data received"}
+
+        # Write to temp file and print via CUPS
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
+            f.write(data)
+            temp_path = f.name
+
+        try:
+            result = subprocess.run(
+                ["lp", "-d", PRINTER_NAME, "-o", "raw", temp_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode != 0:
+                print(f"[PRINT] Error: {result.stderr}")
+                return {"status": "error", "message": result.stderr}
+
+            print(f"[PRINT] Raw print job sent ({len(data)} bytes)")
+            return {"status": "printed", "bytes": len(data)}
+
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+    except Exception as e:
+        print(f"[PRINT] Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/print_receipt")
+async def print_receipt(request: Request):
+    """
+    Print a receipt from HTML or text content.
+    Converts to ESC/POS format for thermal printer.
+
+    Request body: JSON with {"content": "receipt text or html", "cut": true}
+    Response: {"status": "printed"} or {"status": "error", "message": "..."}
+    """
+    try:
+        body = await request.json()
+        content = body.get("content", "")
+        should_cut = body.get("cut", True)
+        open_drawer = body.get("open_drawer", False)
+
+        if not content:
+            return {"status": "error", "message": "No content provided"}
+
+        # Build ESC/POS data
+        esc_data = bytearray()
+
+        # Initialize printer
+        esc_data.extend(b'\x1b\x40')  # ESC @ - Initialize printer
+
+        # If HTML, strip tags for now (basic conversion)
+        if '<' in content and '>' in content:
+            import re
+            # Remove HTML tags
+            text = re.sub(r'<br\s*/?>', '\n', content, flags=re.IGNORECASE)
+            text = re.sub(r'<[^>]+>', '', text)
+            # Decode HTML entities
+            text = text.replace('&nbsp;', ' ')
+            text = text.replace('&amp;', '&')
+            text = text.replace('&lt;', '<')
+            text = text.replace('&gt;', '>')
+            content = text
+
+        # Add content
+        esc_data.extend(content.encode('utf-8', errors='replace'))
+
+        # Add line feeds before cut
+        esc_data.extend(b'\n\n\n\n')
+
+        # Cut paper if requested
+        if should_cut:
+            esc_data.extend(b'\x1d\x56\x00')  # GS V 0 - Full cut
+
+        # Open cash drawer if requested
+        if open_drawer:
+            esc_data.extend(CASH_DRAWER_OPEN_CMD)
+
+        # Print via CUPS
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
+            f.write(esc_data)
+            temp_path = f.name
+
+        try:
+            result = subprocess.run(
+                ["lp", "-d", PRINTER_NAME, "-o", "raw", temp_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode != 0:
+                print(f"[PRINT] Error: {result.stderr}")
+                return {"status": "error", "message": result.stderr}
+
+            print(f"[PRINT] Receipt printed ({len(esc_data)} bytes)")
+            return {"status": "printed", "bytes": len(esc_data)}
+
+        finally:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+    except Exception as e:
+        print(f"[PRINT] Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/print_image")
+async def print_image(request: Request):
+    """
+    Print a base64-encoded image (from Odoo's htmlToCanvas).
+    Converts to ESC/POS raster format for thermal printer.
+
+    Request body: JSON with {"image": "base64_jpeg_data"}
+    Response: {"status": "printed"} or {"status": "error", "message": "..."}
+    """
+    try:
+        import base64
+
+        body = await request.json()
+        image_data = body.get("image", "")
+
+        if not image_data:
+            return {"status": "error", "message": "No image data provided"}
+
+        # Decode base64 image
+        try:
+            # Remove data URL prefix if present
+            if "," in image_data:
+                image_data = image_data.split(",")[1]
+
+            image_bytes = base64.b64decode(image_data)
+        except Exception as e:
+            return {"status": "error", "message": f"Invalid base64 data: {e}"}
+
+        # For now, save as temp file and print via CUPS
+        # A full implementation would convert JPEG to ESC/POS raster bitmap
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as f:
+            f.write(image_bytes)
+            temp_path = f.name
+
+        try:
+            # Try printing the image directly
+            # Note: This may require printer-specific drivers
+            result = subprocess.run(
+                ["lp", "-d", PRINTER_NAME, temp_path],
+                capture_output=True,
+                text=True,
+                timeout=15
+            )
+
+            if result.returncode != 0:
+                print(f"[PRINT] Image print error: {result.stderr}")
+                # Fallback: return error so client can use text printing
+                return {"status": "error", "message": "Image printing not supported"}
+
+            print(f"[PRINT] Image printed ({len(image_bytes)} bytes)")
+            return {"status": "printed", "bytes": len(image_bytes)}
+
+        finally:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+    except Exception as e:
+        print(f"[PRINT] Image error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/open_drawer")
+async def open_drawer():
+    """
+    Open the cash drawer connected to the printer.
+
+    Response: {"status": "opened"} or {"status": "error", "message": "..."}
+    """
+    try:
+        # Send cash drawer open command
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
+            f.write(CASH_DRAWER_OPEN_CMD)
+            temp_path = f.name
+
+        try:
+            result = subprocess.run(
+                ["lp", "-d", PRINTER_NAME, "-o", "raw", temp_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode != 0:
+                print(f"[DRAWER] Error: {result.stderr}")
+                return {"status": "error", "message": result.stderr}
+
+            print("[DRAWER] Cash drawer opened")
+            return {"status": "opened"}
+
+        finally:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+    except Exception as e:
+        print(f"[DRAWER] Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/printer_status")
+def printer_status():
+    """
+    Check printer status.
+
+    Response: {"status": "ready", "printer": "epson_pos"} or error
+    """
+    try:
+        result = subprocess.run(
+            ["lpstat", "-p", PRINTER_NAME],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        output = result.stdout.strip()
+        is_ready = "idle" in output.lower() or "enabled" in output.lower()
+
+        return {
+            "status": "ready" if is_ready else "busy",
+            "printer": PRINTER_NAME,
+            "details": output
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 if __name__ == "__main__":
     import os
 
@@ -312,11 +582,12 @@ if __name__ == "__main__":
     protocol = "https" if use_https else "http"
 
     print("=" * 60)
-    print("Magellan Scale Scanner Bridge")
+    print("Magellan Scale Scanner Bridge + Receipt Printer")
     print("=" * 60)
     print(f"Serial Port: {SERIAL_PORT}")
     print(f"Baudrate: {BAUDRATE}")
     print(f"Weight Divisor: {WEIGHT_DIVISOR}")
+    print(f"Printer: {PRINTER_NAME}")
     print(f"HTTP Server: {protocol}://{SERVER_HOST}:{SERVER_PORT}")
     print()
     print("SSL Certificate Check:")
@@ -360,6 +631,10 @@ if __name__ == "__main__":
     print("Bridge is running!")
     print(f"Test with: curl {'-k ' if use_https else ''}{protocol}://localhost:{SERVER_PORT}/barcode")
     print(f"           curl {'-k ' if use_https else ''}{protocol}://localhost:{SERVER_PORT}/weight")
+    print(f"           curl {'-k ' if use_https else ''}{protocol}://localhost:{SERVER_PORT}/printer_status")
+    print()
+    print("Print test:")
+    print(f"  echo -e '\\x1B@TEST RECEIPT\\n\\x1DVA0' | curl -X POST -H 'Content-Type: application/octet-stream' --data-binary @- {'-k ' if use_https else ''}{protocol}://localhost:{SERVER_PORT}/print_raw")
     print()
 
     if use_https:
