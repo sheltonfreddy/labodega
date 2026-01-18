@@ -1,6 +1,6 @@
 {
     "name": "POS Magellan Scale Integration",
-    "version": "18.0.1.0.2",  # Bumped for print service
+    "version": "18.0.1.0.4",  # Fixed hardware_proxy integration
     "depends": ["point_of_sale"],
     "author": "Shelton / Labodega",
     "category": "Point of Sale",
