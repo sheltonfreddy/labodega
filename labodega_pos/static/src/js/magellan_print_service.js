@@ -101,11 +101,227 @@ async function openCashDrawer() {
     }
 }
 
+// Receipt width in characters (42 for 80mm paper, 32 for 58mm)
+const RECEIPT_WIDTH = 42;
+
+/**
+ * Format a two-column line (left-aligned text, right-aligned price)
+ */
+function formatLine(left, right, width = RECEIPT_WIDTH) {
+    left = String(left || '').substring(0, width - 12);
+    right = String(right || '').substring(0, 12);
+    const padding = width - left.length - right.length;
+    return left + ' '.repeat(Math.max(1, padding)) + right;
+}
+
+/**
+ * Center text within receipt width
+ */
+function centerText(text, width = RECEIPT_WIDTH) {
+    text = String(text || '');
+    if (text.length >= width) return text.substring(0, width);
+    const padding = Math.floor((width - text.length) / 2);
+    return ' '.repeat(padding) + text;
+}
+
 /**
  * Convert HTML element to ESC/POS format
+ * Specifically handles the compact receipt template structure
  */
 function htmlToEscPos(element) {
     let output = COMMANDS.INIT;
+
+    // Debug: Log the HTML structure we're receiving
+    console.log("[Magellan Print] HTML to convert:", element.outerHTML?.substring(0, 500));
+    console.log("[Magellan Print] Classes:", element.className);
+
+    // Try to detect if this is a compact receipt
+    const compactEl = element.querySelector('.compact-receipt');
+    const posReceiptEl = element.querySelector('.pos-receipt');
+
+    console.log("[Magellan Print] Found .compact-receipt:", !!compactEl);
+    console.log("[Magellan Print] Found .pos-receipt:", !!posReceiptEl);
+    console.log("[Magellan Print] Element has .compact-receipt:", element.classList?.contains('compact-receipt'));
+
+    const isCompactReceipt = compactEl || posReceiptEl ||
+                              element.classList?.contains('compact-receipt') ||
+                              element.classList?.contains('pos-receipt');
+
+    if (isCompactReceipt) {
+        console.log("[Magellan Print] Using compact receipt converter");
+        // Use the found element or the main element
+        const receiptEl = compactEl || posReceiptEl || element;
+        output += convertCompactReceipt(receiptEl);
+    } else {
+        console.log("[Magellan Print] Using generic HTML converter");
+        output += convertGenericHtml(element);
+    }
+
+    output += COMMANDS.FEED_3;
+    output += COMMANDS.CUT;
+
+    console.log("[Magellan Print] Final ESC/POS output preview:", output.substring(0, 300));
+    return output;
+}
+
+/**
+ * Convert compact receipt HTML to ESC/POS
+ */
+function convertCompactReceipt(element) {
+    let output = '';
+    const separator = '-'.repeat(RECEIPT_WIDTH) + '\n';
+
+    // Skip logo - thermal printers handle images differently
+    // We'll just add some spacing
+    output += '\n';
+
+    // Company info (centered)
+    const companyInfo = element.querySelector('.company-info, .h2');
+    if (companyInfo) {
+        output += COMMANDS.ALIGN_CENTER;
+        const lines = companyInfo.innerText.split('\n').filter(l => l.trim());
+        for (const line of lines) {
+            output += line.trim() + '\n';
+        }
+        output += COMMANDS.ALIGN_LEFT;
+    }
+
+    // Meta info (order #, date, cashier)
+    const meta = element.querySelector('.meta');
+    if (meta) {
+        output += '\n';
+        const metaRows = meta.querySelectorAll('.meta-row');
+        for (const row of metaRows) {
+            const lbl = row.querySelector('.meta-lbl')?.textContent?.trim() || '';
+            const val = row.querySelector('.meta-val')?.textContent?.trim() || row.textContent.trim();
+            if (lbl) {
+                output += formatLine(lbl, val) + '\n';
+            } else {
+                output += val + '\n';
+            }
+        }
+    }
+
+    // Separator
+    output += separator;
+
+    // Order lines
+    const lines = element.querySelector('.lines');
+    if (lines) {
+        const orderlines = lines.querySelectorAll('.orderline-row');
+        for (const line of orderlines) {
+            // Get product name and qty
+            const nameCell = line.querySelector('.product-name-cell, .name');
+            const priceCell = line.querySelector('.price-cell, .price');
+
+            let productName = '';
+            let qty = '';
+            let price = '';
+
+            if (nameCell) {
+                const nameEl = nameCell.querySelector('.name');
+                const qtyEl = nameCell.querySelector('.qty');
+                productName = nameEl?.textContent?.trim() || nameCell.textContent.trim();
+                qty = qtyEl?.textContent?.trim() || '';
+            }
+
+            if (priceCell) {
+                price = priceCell.textContent.trim();
+            }
+
+            // Format: "Product Name x2              $10.00"
+            let leftPart = productName;
+            if (qty && !qty.includes('1.00') && !qty.includes('x1')) {
+                leftPart += ' ' + qty;
+            }
+
+            output += formatLine(leftPart, price) + '\n';
+
+            // Check for sub-line (qty @ unit price)
+            const nextSibling = line.nextElementSibling;
+            if (nextSibling?.classList?.contains('sub')) {
+                output += '  ' + nextSibling.textContent.trim() + '\n';
+            }
+        }
+
+        // Also check for lines without orderline-row class
+        const allDivs = lines.querySelectorAll(':scope > div');
+        if (orderlines.length === 0) {
+            for (const div of allDivs) {
+                const text = div.textContent.trim();
+                if (text && !div.classList.contains('sep')) {
+                    output += text + '\n';
+                }
+            }
+        }
+    }
+
+    // Separator
+    output += separator;
+
+    // Totals section
+    const totals = element.querySelector('.totals');
+    if (totals) {
+        const totalsTables = totals.querySelectorAll('.totals-table');
+        for (const table of totalsTables) {
+            const rows = table.querySelectorAll('tr');
+            for (const row of rows) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    const label = cells[0].textContent.trim();
+                    const amount = cells[1].textContent.trim();
+
+                    // Check if this is the TOTAL row
+                    if (row.classList.contains('total-row') || label.toUpperCase() === 'TOTAL') {
+                        output += COMMANDS.BOLD_ON;
+                        output += formatLine(label, amount) + '\n';
+                        output += COMMANDS.BOLD_OFF;
+                    } else {
+                        output += formatLine(label, amount) + '\n';
+                    }
+                }
+            }
+        }
+
+        // Thin separators between sections
+        const thinSeps = totals.querySelectorAll('.sep.thin');
+        // We'll handle these naturally in the flow
+    }
+
+    // Footer text
+    const footerText = element.querySelector('.footer-text');
+    if (footerText) {
+        output += '\n' + footerText.textContent.trim() + '\n';
+    }
+
+    // Thank you message
+    const thanks = element.querySelector('.thanks');
+    if (thanks) {
+        output += '\n';
+        output += COMMANDS.ALIGN_CENTER;
+        output += COMMANDS.BOLD_ON;
+        output += thanks.textContent.trim() + '\n';
+        output += COMMANDS.BOLD_OFF;
+        output += COMMANDS.ALIGN_LEFT;
+    }
+
+    // Footer section
+    const footer = element.querySelector('.footer');
+    if (footer && !thanks) {
+        output += '\n';
+        output += COMMANDS.ALIGN_CENTER;
+        output += footer.textContent.trim() + '\n';
+        output += COMMANDS.ALIGN_LEFT;
+    }
+
+    return output;
+}
+
+/**
+ * Generic HTML to ESC/POS conversion (fallback)
+ */
+function convertGenericHtml(element) {
+    let output = '';
 
     const processNode = (node, depth = 0) => {
         let text = '';
@@ -130,7 +346,7 @@ function htmlToEscPos(element) {
                 return '\n';
 
             case 'hr':
-                return '-'.repeat(42) + '\n';
+                return '-'.repeat(RECEIPT_WIDTH) + '\n';
 
             case 'h1':
             case 'h2':
@@ -154,6 +370,10 @@ function htmlToEscPos(element) {
             case 'div':
             case 'p':
             case 'section':
+                // Check for separator class
+                if (className.includes('sep')) {
+                    return '-'.repeat(RECEIPT_WIDTH) + '\n';
+                }
                 for (const child of node.childNodes) {
                     text += processNode(child, depth + 1);
                 }
@@ -163,15 +383,9 @@ function htmlToEscPos(element) {
                 return text;
 
             case 'span':
-                if (className.includes('text-center') || className.includes('center')) {
-                    text += COMMANDS.ALIGN_CENTER;
-                } else if (className.includes('text-end') || className.includes('right')) {
-                    text += COMMANDS.ALIGN_RIGHT;
-                }
                 for (const child of node.childNodes) {
                     text += processNode(child, depth + 1);
                 }
-                text += COMMANDS.ALIGN_LEFT;
                 return text;
 
             case 'table':
@@ -183,10 +397,7 @@ function htmlToEscPos(element) {
                         cellTexts.push(cell.textContent.trim());
                     }
                     if (cellTexts.length === 2) {
-                        const left = cellTexts[0].substring(0, 28);
-                        const right = cellTexts[1].substring(0, 12);
-                        const padding = 42 - left.length - right.length;
-                        text += left + ' '.repeat(Math.max(1, padding)) + right + '\n';
+                        text += formatLine(cellTexts[0], cellTexts[1]) + '\n';
                     } else if (cellTexts.length > 0) {
                         text += cellTexts.join(' ') + '\n';
                     }
@@ -206,10 +417,7 @@ function htmlToEscPos(element) {
         }
     };
 
-    output += processNode(element);
-    output += COMMANDS.FEED_5;
-    output += COMMANDS.CUT;
-
+    output = processNode(element);
     return output;
 }
 
