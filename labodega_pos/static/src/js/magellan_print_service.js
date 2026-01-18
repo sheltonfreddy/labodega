@@ -34,6 +34,7 @@ let bridgeUrl = null;
 
 /**
  * Send raw ESC/POS data to printer via Pi bridge
+ * Properly encodes the string as bytes for the printer
  */
 async function sendToPrinter(data) {
     if (!bridgeUrl) {
@@ -43,12 +44,19 @@ async function sendToPrinter(data) {
     try {
         console.log("[Magellan Print] Sending to printer:", bridgeUrl, "Data length:", data.length);
 
+        // Convert string to Uint8Array for proper byte transmission
+        // This ensures ESC/POS control characters are sent correctly
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(data);
+
+        console.log("[Magellan Print] Encoded bytes:", bytes.length);
+
         const response = await fetch(`${bridgeUrl}/print_raw`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/octet-stream',
             },
-            body: data,
+            body: bytes,
             signal: AbortSignal.timeout(15000),
         });
 
@@ -101,17 +109,46 @@ async function openCashDrawer() {
     }
 }
 
-// Receipt width in characters (42 for 80mm paper, 32 for 58mm)
-const RECEIPT_WIDTH = 42;
+// Receipt width in characters (48 for 80mm paper at standard font, 32 for 58mm)
+// Using 48 to avoid cutting off text
+const RECEIPT_WIDTH = 48;
 
 /**
  * Format a two-column line (left-aligned text, right-aligned price)
+ * Allows longer text and wraps if needed
  */
 function formatLine(left, right, width = RECEIPT_WIDTH) {
-    left = String(left || '').substring(0, width - 12);
-    right = String(right || '').substring(0, 12);
+    left = String(left || '');
+    right = String(right || '');
+
+    // Calculate available space for left side (leave room for right + 1 space)
+    const rightLen = right.length;
+    const maxLeftLen = width - rightLen - 1;
+
+    // If left is too long, we need to wrap or truncate
+    if (left.length > maxLeftLen) {
+        // For now, truncate with ellipsis but keep more chars
+        left = left.substring(0, maxLeftLen - 1) + '…';
+    }
+
     const padding = width - left.length - right.length;
     return left + ' '.repeat(Math.max(1, padding)) + right;
+}
+
+/**
+ * Format a single line that may need wrapping
+ */
+function formatSingleLine(text, width = RECEIPT_WIDTH) {
+    text = String(text || '');
+    if (text.length <= width) return text;
+
+    // Split into multiple lines
+    const lines = [];
+    while (text.length > 0) {
+        lines.push(text.substring(0, width));
+        text = text.substring(width);
+    }
+    return lines.join('\n');
 }
 
 /**
@@ -170,33 +207,49 @@ function htmlToEscPos(element) {
 function convertCompactReceipt(element) {
     let output = '';
     const separator = '-'.repeat(RECEIPT_WIDTH) + '\n';
+    const thinSeparator = '-'.repeat(RECEIPT_WIDTH) + '\n';
 
-    // Skip logo - thermal printers handle images differently
-    // We'll just add some spacing
-    output += '\n';
+    // Header - Company name (bold, centered)
+    output += COMMANDS.ALIGN_CENTER;
+    output += COMMANDS.BOLD_ON;
 
-    // Company info (centered)
+    // Try to get company name from various places
+    const logoSection = element.querySelector('.logo-section');
+    const companyName = element.querySelector('.company-name');
+
+    // If there's a company name element, use it
+    if (companyName && companyName.textContent.trim()) {
+        output += companyName.textContent.trim() + '\n';
+    } else {
+        // Default company name if not found
+        output += 'LA BODEGA\n';
+    }
+    output += COMMANDS.BOLD_OFF;
+
+    // Company info (address, phone - centered)
     const companyInfo = element.querySelector('.company-info, .h2');
     if (companyInfo) {
-        output += COMMANDS.ALIGN_CENTER;
-        const lines = companyInfo.innerText.split('\n').filter(l => l.trim());
-        for (const line of lines) {
-            output += line.trim() + '\n';
+        const infoText = companyInfo.innerText.trim();
+        if (infoText) {
+            const lines = infoText.split('\n').filter(l => l.trim());
+            for (const line of lines) {
+                output += line.trim() + '\n';
+            }
         }
-        output += COMMANDS.ALIGN_LEFT;
     }
+    output += COMMANDS.ALIGN_LEFT;
+    output += '\n';
 
     // Meta info (order #, date, cashier)
     const meta = element.querySelector('.meta');
     if (meta) {
-        output += '\n';
         const metaRows = meta.querySelectorAll('.meta-row');
         for (const row of metaRows) {
             const lbl = row.querySelector('.meta-lbl')?.textContent?.trim() || '';
             const val = row.querySelector('.meta-val')?.textContent?.trim() || row.textContent.trim();
-            if (lbl) {
-                output += formatLine(lbl, val) + '\n';
-            } else {
+            if (lbl && val) {
+                output += formatLine(lbl + ':', val) + '\n';
+            } else if (val) {
                 output += val + '\n';
             }
         }
@@ -206,92 +259,102 @@ function convertCompactReceipt(element) {
     output += separator;
 
     // Order lines
-    const lines = element.querySelector('.lines');
-    if (lines) {
-        const orderlines = lines.querySelectorAll('.orderline-row');
+    const linesContainer = element.querySelector('.lines');
+    if (linesContainer) {
+        const orderlines = linesContainer.querySelectorAll('.orderline-row');
+
         for (const line of orderlines) {
-            // Get product name and qty
-            const nameCell = line.querySelector('.product-name-cell, .name');
-            const priceCell = line.querySelector('.price-cell, .price');
+            // Get product name, qty, and price
+            const nameEl = line.querySelector('.name');
+            const qtyEl = line.querySelector('.qty');
+            const priceEl = line.querySelector('.price-cell, .price');
 
-            let productName = '';
-            let qty = '';
-            let price = '';
+            let productName = nameEl?.textContent?.trim() || '';
+            let qty = qtyEl?.textContent?.trim() || '';
+            let price = priceEl?.textContent?.trim() || '';
 
-            if (nameCell) {
-                const nameEl = nameCell.querySelector('.name');
-                const qtyEl = nameCell.querySelector('.qty');
-                productName = nameEl?.textContent?.trim() || nameCell.textContent.trim();
-                qty = qtyEl?.textContent?.trim() || '';
+            // If no specific elements, try table cells
+            if (!productName) {
+                const nameCell = line.querySelector('.product-name-cell');
+                if (nameCell) {
+                    productName = nameCell.querySelector('.name')?.textContent?.trim() ||
+                                  nameCell.textContent.trim().split(/\s+x/)[0];
+                    const qtyMatch = nameCell.textContent.match(/x([\d.]+)/);
+                    if (qtyMatch) qty = 'x' + qtyMatch[1];
+                }
+            }
+            if (!price) {
+                const cells = line.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    price = cells[cells.length - 1].textContent.trim();
+                }
             }
 
-            if (priceCell) {
-                price = priceCell.textContent.trim();
-            }
-
-            // Format: "Product Name x2              $10.00"
+            // Build the line
             let leftPart = productName;
-            if (qty && !qty.includes('1.00') && !qty.includes('x1')) {
+            if (qty && qty !== 'x1' && qty !== 'x1.00' && !qty.includes('1.00')) {
                 leftPart += ' ' + qty;
             }
 
-            output += formatLine(leftPart, price) + '\n';
+            if (leftPart && price) {
+                output += formatLine(leftPart, price) + '\n';
+            } else if (leftPart || price) {
+                output += (leftPart || price) + '\n';
+            }
 
-            // Check for sub-line (qty @ unit price)
-            const nextSibling = line.nextElementSibling;
-            if (nextSibling?.classList?.contains('sub')) {
-                output += '  ' + nextSibling.textContent.trim() + '\n';
+            // Check for sub-line (qty @ unit price) - look at next sibling
+            let nextEl = line.nextElementSibling;
+            while (nextEl && nextEl.classList?.contains('sub')) {
+                output += '  ' + nextEl.textContent.trim() + '\n';
+                nextEl = nextEl.nextElementSibling;
+            }
+
+            // Check for notes
+            const note = line.querySelector('.note');
+            if (note) {
+                output += '  ' + note.textContent.trim() + '\n';
             }
         }
 
-        // Also check for lines without orderline-row class
-        const allDivs = lines.querySelectorAll(':scope > div');
-        if (orderlines.length === 0) {
-            for (const div of allDivs) {
-                const text = div.textContent.trim();
-                if (text && !div.classList.contains('sep')) {
-                    output += text + '\n';
-                }
-            }
-        }
+        // Also handle .sub elements that might be direct children
+        const subLines = linesContainer.querySelectorAll(':scope > .sub');
+        // These are already handled above when iterating orderlines
     }
 
-    // Separator
+    // Separator before totals
     output += separator;
 
     // Totals section
     const totals = element.querySelector('.totals');
     if (totals) {
-        const totalsTables = totals.querySelectorAll('.totals-table');
-        for (const table of totalsTables) {
-            const rows = table.querySelectorAll('tr');
-            for (const row of rows) {
-                const cells = row.querySelectorAll('td');
-                if (cells.length >= 2) {
-                    const label = cells[0].textContent.trim();
-                    const amount = cells[1].textContent.trim();
+        const rows = totals.querySelectorAll('tr');
+        for (const row of rows) {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 2) {
+                const label = cells[0].textContent.trim();
+                const amount = cells[1].textContent.trim();
 
-                    // Check if this is the TOTAL row
-                    if (row.classList.contains('total-row') || label.toUpperCase() === 'TOTAL') {
-                        output += COMMANDS.BOLD_ON;
-                        output += formatLine(label, amount) + '\n';
-                        output += COMMANDS.BOLD_OFF;
-                    } else {
-                        output += formatLine(label, amount) + '\n';
-                    }
+                // Check if this is the TOTAL row - make it bold
+                if (row.classList.contains('total-row') ||
+                    label.toUpperCase() === 'TOTAL' ||
+                    row.closest('.total-row')) {
+                    output += COMMANDS.BOLD_ON;
+                    output += formatLine(label, amount) + '\n';
+                    output += COMMANDS.BOLD_OFF;
+                } else {
+                    output += formatLine(label, amount) + '\n';
                 }
             }
         }
-
-        // Thin separators between sections
-        const thinSeps = totals.querySelectorAll('.sep.thin');
-        // We'll handle these naturally in the flow
     }
 
-    // Footer text
+    // Footer text (custom message)
     const footerText = element.querySelector('.footer-text');
-    if (footerText) {
-        output += '\n' + footerText.textContent.trim() + '\n';
+    if (footerText && footerText.textContent.trim()) {
+        output += '\n';
+        output += COMMANDS.ALIGN_CENTER;
+        output += footerText.textContent.trim() + '\n';
+        output += COMMANDS.ALIGN_LEFT;
     }
 
     // Thank you message
@@ -305,13 +368,16 @@ function convertCompactReceipt(element) {
         output += COMMANDS.ALIGN_LEFT;
     }
 
-    // Footer section
+    // Generic footer
     const footer = element.querySelector('.footer');
     if (footer && !thanks) {
-        output += '\n';
-        output += COMMANDS.ALIGN_CENTER;
-        output += footer.textContent.trim() + '\n';
-        output += COMMANDS.ALIGN_LEFT;
+        const footerContent = footer.textContent.trim();
+        if (footerContent) {
+            output += '\n';
+            output += COMMANDS.ALIGN_CENTER;
+            output += footerContent + '\n';
+            output += COMMANDS.ALIGN_LEFT;
+        }
     }
 
     return output;
@@ -399,7 +465,7 @@ function convertGenericHtml(element) {
                     if (cellTexts.length === 2) {
                         text += formatLine(cellTexts[0], cellTexts[1]) + '\n';
                     } else if (cellTexts.length > 0) {
-                        text += cellTexts.join(' ') + '\n';
+                        text += cellTexts.join('  ') + '\n';
                     }
                 }
                 return text;

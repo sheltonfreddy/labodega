@@ -1,6 +1,6 @@
 {
     "name": "POS Magellan Scale Integration",
-    "version": "18.0.1.0.6",  # Added receipt debug logging
+    "version": "18.0.1.0.8",  # Fixed encoding and receipt formatting
     "depends": ["point_of_sale"],
     "author": "Shelton / Labodega",
     "category": "Point of Sale",
