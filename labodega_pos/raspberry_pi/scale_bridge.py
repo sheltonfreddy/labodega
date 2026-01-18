@@ -150,10 +150,12 @@ def clean_magellan_barcode(barcode: str) -> str:
     # List of known Magellan prefixes to strip
     prefixes = [
         'S08A',  # Common Magellan prefix
-        'S08',   # Alternate prefix
-        'S09',   # Another variant
-        'S0A',   # Short variant
-        'F',  # EAN/UPC symbology identifier
+        'S08F',  # EAN-13 with symbology identifier
+        'S08E',  # EAN variant
+        'S08',  # Alternate prefix
+        'S09',  # Another variant
+        'S0A',  # Short variant
+        'F',  # Standalone EAN/UPC symbology identifier
         'E',  # Another EAN variant
         'A',  # UPC-A identifier
     ]
