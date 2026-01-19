@@ -7,11 +7,11 @@ import { getBridgeUrl } from "./magellan_config";
  * Magellan Print Service
  * Sends receipts directly to Raspberry Pi Epson printer without browser print dialog
  *
- * IMPORTANT: This version builds ESC/POS directly from order model data,
- * NOT from parsing HTML. This is more reliable and produces consistent output.
+ * This version parses the rendered HTML receipt that Odoo provides,
+ * which is more reliable than trying to access the order model directly.
  */
 
-console.log("[Magellan Print] magellan_print_service.js loaded (ORDER MODEL VERSION)");
+console.log("[Magellan Print] magellan_print_service.js loaded (HTML PARSER VERSION)");
 
 // ESC/POS Commands
 const ESC = '\x1b';
@@ -40,28 +40,9 @@ const COMMANDS = {
 // Receipt width in characters (48 for 80mm paper at standard font)
 const RECEIPT_WIDTH = 48;
 
-// Store POS environment globally for printing
-let POS_ENV = null;
+// Store bridge URL globally
 let bridgeUrl = null;
-
-/**
- * Format currency value
- */
-function formatCurrency(pos, amount) {
-    if (typeof amount !== 'number' || isNaN(amount)) {
-        amount = 0;
-    }
-    const currency = pos.currency;
-    const symbol = currency?.symbol || '$';
-    const decimals = currency?.decimal_places ?? 2;
-    const formatted = amount.toFixed(decimals);
-
-    // Position symbol based on currency settings
-    if (currency?.position === 'after') {
-        return `${formatted} ${symbol}`;
-    }
-    return `${symbol} ${formatted}`;
-}
+let POS_ENV = null;
 
 /**
  * Format a two-column line (left-aligned text, right-aligned value)
@@ -100,31 +81,80 @@ function separator(char = '-', width = RECEIPT_WIDTH) {
 }
 
 /**
- * Build ESC/POS receipt directly from order model data
- * This is the main function that creates the receipt content
+ * Extract text content from an element, handling nested elements
  */
-function buildEscposFromOrder(pos, order) {
+function getTextContent(element) {
+    if (!element) return '';
+    // Get text content, normalize whitespace
+    return (element.textContent || element.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Parse the rendered HTML receipt and convert to ESC/POS format
+ * This parses the actual Odoo 18 receipt HTML structure
+ */
+function parseHtmlToEscpos(receiptElement) {
     let output = COMMANDS.INIT;
 
-    // === HEADER - Company Info ===
-    const company = pos.company;
-    output += COMMANDS.ALIGN_CENTER;
-    output += COMMANDS.BOLD_ON;
-    output += COMMANDS.DOUBLE_HEIGHT;
-    output += (company?.name || 'LA BODEGA') + '\n';
-    output += COMMANDS.NORMAL;
-    output += COMMANDS.BOLD_OFF;
+    console.log("[Magellan Print] Parsing HTML receipt (Odoo 18 structure)...");
+    console.log("[Magellan Print] Full HTML:", receiptElement.outerHTML.substring(0, 2000));
 
-    // Company address
-    if (company?.street) {
-        output += company.street + '\n';
+    // Get the receipt container
+    const receipt = receiptElement.querySelector('.pos-receipt') || receiptElement;
+
+    // === HEADER - Company Info (from ReceiptHeader component) ===
+    output += COMMANDS.ALIGN_CENTER;
+
+    // Company name - Odoo 18's ReceiptHeader puts company name as first div in .pos-receipt-contact
+    const contactSection = receipt.querySelector('.pos-receipt-contact');
+    let companyName = '';
+    let companyInfoStartIndex = 0;
+
+    if (contactSection) {
+        // First div is usually company name
+        const allDivs = contactSection.querySelectorAll('div');
+        if (allDivs.length > 0) {
+            companyName = getTextContent(allDivs[0]);
+            companyInfoStartIndex = 1;
+        }
     }
-    if (company?.city || company?.state_id || company?.zip) {
-        const cityLine = [company?.city, company?.state_id?.[1], company?.zip].filter(Boolean).join(', ');
-        if (cityLine) output += cityLine + '\n';
+
+    // Fallback selectors
+    if (!companyName) {
+        const companyNameEl = receipt.querySelector('.pos-receipt-company-name, .company-name, h2.name');
+        if (companyNameEl) {
+            companyName = getTextContent(companyNameEl);
+        }
     }
-    if (company?.phone) {
-        output += 'Tel: ' + company.phone + '\n';
+
+    if (companyName) {
+        output += COMMANDS.BOLD_ON;
+        output += COMMANDS.DOUBLE_HEIGHT;
+        output += companyName + '\n';
+        output += COMMANDS.NORMAL;
+        output += COMMANDS.BOLD_OFF;
+    }
+
+    // Company address/contact - remaining divs in .pos-receipt-contact
+    if (contactSection) {
+        const allDivs = contactSection.querySelectorAll('div');
+        for (let i = companyInfoStartIndex; i < allDivs.length; i++) {
+            const text = getTextContent(allDivs[i]);
+            // Skip separator lines and cashier (handled separately)
+            if (text && text.length > 2 && !text.startsWith('---') && !text.includes('Cashier')) {
+                output += text + '\n';
+            }
+        }
+
+        // Look for cashier in .cashier
+        const cashierEl = contactSection.querySelector('.cashier');
+        if (cashierEl) {
+            const cashierText = getTextContent(cashierEl).replace(/^-+/, '').trim();
+            if (cashierText) {
+                output += '\n';
+                output += formatLine('Cashier:', cashierText) + '\n';
+            }
+        }
     }
 
     output += COMMANDS.ALIGN_LEFT;
@@ -133,227 +163,284 @@ function buildEscposFromOrder(pos, order) {
     // === ORDER INFO ===
     output += separator() + '\n';
 
-    // Order number
-    const orderName = order.name || order.uid || 'N/A';
-    output += formatLine('Order:', orderName) + '\n';
-
-    // Date/time
-    const orderDate = order.date_order || order.creation_date || new Date();
-    let dateStr;
-    if (orderDate instanceof Date) {
-        dateStr = orderDate.toLocaleString();
-    } else if (typeof orderDate === 'string') {
-        dateStr = orderDate;
-    } else {
-        dateStr = new Date().toLocaleString();
-    }
-    output += formatLine('Date:', dateStr) + '\n';
-
-    // Cashier
-    const cashier = order.cashier || order.user_id || pos.user;
-    const cashierName = cashier?.name || cashier?.[1] || 'N/A';
-    output += formatLine('Cashier:', cashierName) + '\n';
-
-    // Customer (if set)
-    const partner = order.partner_id || order.get_partner?.();
-    if (partner) {
-        const partnerName = partner.name || partner[1] || '';
-        if (partnerName) {
-            output += formatLine('Customer:', partnerName) + '\n';
+    // Look for order data at the bottom (Odoo 18 puts it in .pos-receipt-order-data)
+    const orderDataElements = receipt.querySelectorAll('.pos-receipt-order-data');
+    let orderName = '';
+    let orderDate = '';
+    for (const el of orderDataElements) {
+        const text = getTextContent(el);
+        if (text.startsWith('Order')) {
+            orderName = text;
+        } else if (/\d{2}\/\d{2}\/\d{4}/.test(text) || /\d{4}-\d{2}-\d{2}/.test(text)) {
+            orderDate = text;
         }
+    }
+
+    // Also check #order-date
+    const orderDateEl = receipt.querySelector('#order-date');
+    if (orderDateEl) {
+        orderDate = getTextContent(orderDateEl);
+    }
+
+    if (orderName) {
+        output += formatLine('Order:', orderName.replace('Order', '').trim()) + '\n';
+    }
+    if (orderDate) {
+        output += formatLine('Date:', orderDate) + '\n';
+    }
+
+    output += separator() + '\n';
+
+    // === ORDER LINES (Odoo 18 uses li.orderline) ===
+    const orderLines = receipt.querySelectorAll('li.orderline, .orderline');
+
+    console.log("[Magellan Print] Found", orderLines.length, "order lines in HTML");
+
+    for (const line of orderLines) {
+        // Odoo 18 structure:
+        // - .product-name contains the product name
+        // - .product-price.price contains the line total
+        // - .qty contains the quantity
+        // - .price-per-unit contains qty x unit price / unit
+
+        const productNameEl = line.querySelector('.product-name');
+        const productPriceEl = line.querySelector('.product-price.price, .price');
+        const qtyEl = line.querySelector('.qty');
+        const pricePerUnitEl = line.querySelector('.price-per-unit');
+
+        const productName = productNameEl ? getTextContent(productNameEl) : '';
+        const price = productPriceEl ? getTextContent(productPriceEl) : '';
+        const qty = qtyEl ? getTextContent(qtyEl) : '';
+
+        console.log("[Magellan Print] Line:", { productName, price, qty });
+
+        if (productName) {
+            // Format: Product Name (with qty if not 1)          Price
+            let displayName = productName;
+            if (qty && qty !== '1' && qty !== '1.00') {
+                displayName += ` x${qty}`;
+            }
+            output += formatLine(displayName, price) + '\n';
+
+            // Show unit price breakdown if qty > 1
+            if (pricePerUnitEl && qty && qty !== '1') {
+                const pricePerUnitText = getTextContent(pricePerUnitEl);
+                // Extract just the unit price part
+                const unitPriceMatch = pricePerUnitText.match(/x\s*([\$€£]?\s*[\d,.]+)/);
+                if (unitPriceMatch) {
+                    output += `  ${qty} @ ${unitPriceMatch[1]}\n`;
+                }
+            }
+        }
+    }
+
+    // If no orderlines found with li.orderline, try alternative selectors
+    if (orderLines.length === 0) {
+        console.log("[Magellan Print] No orderlines found, trying alternative parsing...");
+
+        // Look for any element that contains product and price info
+        const allText = getTextContent(receipt);
+        console.log("[Magellan Print] Receipt full text:", allText.substring(0, 500));
+    }
+
+    output += separator() + '\n';
+
+    // === TOTALS (Odoo 18 uses .receipt-total, .receipt-rounding, etc.) ===
+    const receiptTotal = receipt.querySelector('.receipt-total');
+    if (receiptTotal) {
+        output += COMMANDS.BOLD_ON;
+        output += formatLine('TOTAL', getTextContent(receiptTotal.querySelector('.pos-receipt-right-align, span:last-child') || receiptTotal)) + '\n';
+        output += COMMANDS.BOLD_OFF;
+    }
+
+    // Rounding
+    const receiptRounding = receipt.querySelector('.receipt-rounding');
+    if (receiptRounding) {
+        const roundingAmount = getTextContent(receiptRounding.querySelector('.pos-receipt-right-align, span:last-child'));
+        output += formatLine('Rounding:', roundingAmount) + '\n';
+    }
+
+    output += separator() + '\n';
+
+    // === PAYMENT INFO (Odoo 18 uses .paymentlines div) ===
+    const paymentLinesContainer = receipt.querySelector('.paymentlines');
+    if (paymentLinesContainer) {
+        const paymentDivs = paymentLinesContainer.children;
+        for (const payment of paymentDivs) {
+            const text = getTextContent(payment);
+            const rightAlign = payment.querySelector('.pos-receipt-right-align');
+            if (rightAlign) {
+                const method = text.replace(getTextContent(rightAlign), '').trim();
+                const amount = getTextContent(rightAlign);
+                output += formatLine(method, amount) + '\n';
+            } else if (text.length > 3) {
+                output += text + '\n';
+            }
+        }
+    }
+
+    // === CHANGE ===
+    const changeElement = receipt.querySelector('.receipt-change');
+    if (changeElement) {
+        const changeAmount = getTextContent(changeElement.querySelector('.pos-receipt-right-align') || changeElement);
+        output += COMMANDS.BOLD_ON;
+        output += formatLine('CHANGE', changeAmount) + '\n';
+        output += COMMANDS.BOLD_OFF;
+    }
+
+    // === FOOTER ===
+    output += '\n';
+    output += COMMANDS.ALIGN_CENTER;
+
+    // Custom footer from config
+    const footerEl = receipt.querySelector('.pos-receipt-center-align');
+    if (footerEl) {
+        const footerText = getTextContent(footerEl);
+        if (footerText && footerText.length > 3) {
+            output += footerText + '\n';
+        }
+    }
+
+    // Thank you message
+    output += COMMANDS.BOLD_ON;
+    output += 'Thank You!\n';
+    output += COMMANDS.BOLD_OFF;
+    output += 'Please Come Again\n';
+
+    output += COMMANDS.ALIGN_LEFT;
+    output += COMMANDS.FEED_3;
+    output += COMMANDS.CUT;
+
+    return output;
+}
+
+/**
+ * Alternative: Build receipt from exported order data if available
+ * This is used when we have access to the order export data
+ */
+function buildEscposFromExportData(data) {
+    let output = COMMANDS.INIT;
+
+    console.log("[Magellan Print] Building from export data...", data);
+
+    // === HEADER ===
+    output += COMMANDS.ALIGN_CENTER;
+    output += COMMANDS.BOLD_ON;
+    output += COMMANDS.DOUBLE_HEIGHT;
+
+    const companyName = data.headerData?.company?.name || data.company?.name || 'LA BODEGA';
+    output += companyName + '\n';
+    output += COMMANDS.NORMAL;
+    output += COMMANDS.BOLD_OFF;
+
+    // Company info from headerData
+    if (data.headerData?.company) {
+        const c = data.headerData.company;
+        if (c.street) output += c.street + '\n';
+        if (c.city || c.state || c.zip) {
+            output += [c.city, c.state, c.zip].filter(Boolean).join(', ') + '\n';
+        }
+        if (c.phone) output += 'Tel: ' + c.phone + '\n';
+    }
+
+    output += COMMANDS.ALIGN_LEFT;
+    output += '\n';
+    output += separator() + '\n';
+
+    // === ORDER INFO ===
+    if (data.name) {
+        output += formatLine('Order:', data.name) + '\n';
+    }
+    if (data.date) {
+        output += formatLine('Date:', data.date) + '\n';
+    }
+    if (data.cashier) {
+        output += formatLine('Cashier:', data.cashier) + '\n';
+    }
+    if (data.headerData?.trackingNumber) {
+        output += formatLine('Ticket #:', data.headerData.trackingNumber) + '\n';
     }
 
     output += separator() + '\n';
 
     // === ORDER LINES ===
-    // Get orderlines - handle different Odoo versions
-    let orderlines = [];
-    if (typeof order.get_orderlines === 'function') {
-        orderlines = order.get_orderlines();
-    } else if (order.lines) {
-        // Odoo 18 style - lines is a reactive object/array
-        orderlines = Array.isArray(order.lines) ? order.lines : Object.values(order.lines || {});
-    } else if (order.orderlines) {
-        orderlines = Array.isArray(order.orderlines) ? order.orderlines : Object.values(order.orderlines || {});
+    // Odoo 18 getDisplayData() returns: productName, price (formatted string), qty (string), unitPrice (formatted string)
+    const orderlines = data.orderlines || [];
+    console.log("[Magellan Print] Export data orderlines count:", orderlines.length);
+    if (orderlines.length > 0) {
+        console.log("[Magellan Print] First orderline sample:", orderlines[0]);
     }
 
-    console.log("[Magellan Print] Order lines count:", orderlines.length);
-
     for (const line of orderlines) {
-        // Get product info
-        const product = line.product || line.product_id || line.get_product?.();
-        const productName = product?.display_name || product?.name || product?.[1] || 'Unknown Product';
+        // Odoo 18 fields from getDisplayData()
+        const name = line.productName || line.product_name || line.name || 'Unknown';
+        const qty = line.qty || line.quantity || '1';
+        // price is already formatted as string like "$ 12.50"
+        const priceStr = line.price || '';
+        // unitPrice is already formatted as string
+        const unitPriceStr = line.unitPrice || '';
 
-        // Get quantity
-        let qty = 1;
-        if (typeof line.get_quantity === 'function') {
-            qty = line.get_quantity();
-        } else if (line.qty !== undefined) {
-            qty = line.qty;
-        } else if (line.quantity !== undefined) {
-            qty = line.quantity;
-        }
+        console.log("[Magellan Print] Processing line:", { name, qty, priceStr, unitPriceStr });
 
-        // Get unit price
-        let unitPrice = 0;
-        if (typeof line.get_unit_price === 'function') {
-            unitPrice = line.get_unit_price();
-        } else if (line.price_unit !== undefined) {
-            unitPrice = line.price_unit;
-        } else if (line.unit_price !== undefined) {
-            unitPrice = line.unit_price;
-        }
-
-        // Get line total (price with tax)
-        let lineTotal = 0;
-        if (typeof line.get_price_with_tax === 'function') {
-            lineTotal = line.get_price_with_tax();
-        } else if (typeof line.get_display_price === 'function') {
-            lineTotal = line.get_display_price();
-        } else if (line.price_subtotal_incl !== undefined) {
-            lineTotal = line.price_subtotal_incl;
-        } else if (line.price_subtotal !== undefined) {
-            lineTotal = line.price_subtotal;
-        } else {
-            lineTotal = qty * unitPrice;
-        }
-
-        // Format the line
-        const priceStr = formatCurrency(pos, lineTotal);
-
-        // For qty > 1 or weighted products, show qty in the name
-        let displayName = productName;
-        if (qty !== 1) {
-            // Check if it's a weighted product (decimal qty)
-            if (qty % 1 !== 0) {
-                displayName += ` x${qty.toFixed(2)}`;
-            } else {
-                displayName += ` x${qty}`;
-            }
+        // Product name with qty if > 1
+        let displayName = name;
+        const qtyNum = parseFloat(qty) || 1;
+        if (qtyNum !== 1) {
+            displayName += ` x${qty}`;
         }
 
         output += formatLine(displayName, priceStr) + '\n';
 
-        // If qty > 1, show unit price on sub-line
-        if (qty !== 1 && qty > 0) {
-            const unitPriceStr = formatCurrency(pos, unitPrice);
-            const qtyDisplay = qty % 1 !== 0 ? qty.toFixed(2) : qty.toString();
-            output += `  ${qtyDisplay} @ ${unitPriceStr}\n`;
-        }
-
-        // Check for order line note
-        const note = line.note || line.customer_note || '';
-        if (note) {
-            output += `  Note: ${note}\n`;
+        // Show unit price breakdown if qty > 1
+        if (qtyNum !== 1 && unitPriceStr) {
+            output += `  ${qty} @ ${unitPriceStr}\n`;
         }
     }
 
     output += separator() + '\n';
 
     // === TOTALS ===
-    // Subtotal (before tax)
-    let subtotal = 0;
-    if (typeof order.get_total_without_tax === 'function') {
-        subtotal = order.get_total_without_tax();
-    } else if (order.amount_total !== undefined && order.amount_tax !== undefined) {
-        subtotal = order.amount_total - order.amount_tax;
+    if (data.total_without_tax !== undefined) {
+        output += formatLine('Subtotal:', '$ ' + data.total_without_tax.toFixed(2)) + '\n';
     }
-
-    // Tax
-    let tax = 0;
-    if (typeof order.get_total_tax === 'function') {
-        tax = order.get_total_tax();
-    } else if (order.amount_tax !== undefined) {
-        tax = order.amount_tax;
+    if (data.amount_tax && data.amount_tax > 0) {
+        output += formatLine('Tax:', '$ ' + data.amount_tax.toFixed(2)) + '\n';
     }
-
-    // Total with tax
-    let total = 0;
-    if (typeof order.get_total_with_tax === 'function') {
-        total = order.get_total_with_tax();
-    } else if (order.amount_total !== undefined) {
-        total = order.amount_total;
-    } else {
-        total = subtotal + tax;
-    }
-
-    // Display subtotal
-    output += formatLine('Subtotal:', formatCurrency(pos, subtotal)) + '\n';
-
-    // Display tax (if any)
-    if (tax > 0) {
-        output += formatLine('Tax:', formatCurrency(pos, tax)) + '\n';
-    }
-
-    // Display discounts (if any)
-    let discount = 0;
-    if (typeof order.get_total_discount === 'function') {
-        discount = order.get_total_discount();
-    }
-    if (discount > 0) {
-        output += formatLine('Discount:', '-' + formatCurrency(pos, discount)) + '\n';
+    if (data.total_discount && data.total_discount > 0) {
+        output += formatLine('Discount:', '-$ ' + data.total_discount.toFixed(2)) + '\n';
     }
 
     output += separator('=') + '\n';
 
-    // TOTAL - Bold and bigger
     output += COMMANDS.BOLD_ON;
     output += COMMANDS.DOUBLE_HEIGHT;
-    output += formatLine('TOTAL:', formatCurrency(pos, total)) + '\n';
+    const total = data.amount_total || 0;
+    output += formatLine('TOTAL:', '$ ' + total.toFixed(2)) + '\n';
     output += COMMANDS.NORMAL;
     output += COMMANDS.BOLD_OFF;
 
     output += separator() + '\n';
 
-    // === PAYMENT INFO ===
-    let paymentlines = [];
-    if (typeof order.get_paymentlines === 'function') {
-        paymentlines = order.get_paymentlines();
-    } else if (order.payment_ids) {
-        paymentlines = Array.isArray(order.payment_ids) ? order.payment_ids : Object.values(order.payment_ids || {});
+    // === PAYMENTS ===
+    const paymentlines = data.paymentlines || [];
+    for (const payment of paymentlines) {
+        const name = payment.name || payment.payment_method || 'Payment';
+        const amount = payment.amount || 0;
+        output += formatLine(name + ':', '$ ' + amount.toFixed(2)) + '\n';
     }
 
-    if (paymentlines.length > 0) {
-        for (const payment of paymentlines) {
-            const method = payment.payment_method_id || payment.payment_method || payment.name;
-            const methodName = method?.name || method?.[1] || method || 'Payment';
-
-            let amount = 0;
-            if (typeof payment.get_amount === 'function') {
-                amount = payment.get_amount();
-            } else if (payment.amount !== undefined) {
-                amount = payment.amount;
-            }
-
-            output += formatLine(methodName + ':', formatCurrency(pos, amount)) + '\n';
-        }
-
-        // Change
-        let change = 0;
-        if (typeof order.get_change === 'function') {
-            change = order.get_change();
-        } else if (order.amount_return !== undefined) {
-            change = order.amount_return;
-        }
-
-        if (change > 0) {
-            output += formatLine('Change:', formatCurrency(pos, change)) + '\n';
-        }
-
-        output += '\n';
+    if (data.order_change && data.show_change) {
+        output += formatLine('Change:', '$ ' + data.order_change.toFixed(2)) + '\n';
     }
 
     // === FOOTER ===
+    output += '\n';
     output += COMMANDS.ALIGN_CENTER;
 
-    // Custom receipt footer from POS config
-    const receiptFooter = pos.config?.receipt_footer || '';
-    if (receiptFooter) {
-        output += receiptFooter + '\n';
-        output += '\n';
+    if (data.footer) {
+        output += data.footer + '\n';
     }
 
-    // Thank you message
     output += COMMANDS.BOLD_ON;
     output += 'Thank You!\n';
     output += COMMANDS.BOLD_OFF;
@@ -441,6 +528,9 @@ async function openCashDrawer() {
     }
 }
 
+// Store the last receipt data for printing
+let lastReceiptData = null;
+
 /**
  * Create Magellan printer device compatible with Odoo's PrinterService
  */
@@ -448,44 +538,41 @@ function createMagellanPrinterDevice() {
     return {
         /**
          * Print receipt - called by Odoo's PrinterService
-         * IMPORTANT: This ignores the HTML receipt and builds from order model
-         * @param {HTMLElement|string} receipt - Receipt HTML element (ignored)
+         * @param {HTMLElement} receipt - The rendered receipt HTML element
          * @returns {Promise<{successful: boolean, message?: object}>}
          */
         async printReceipt(receipt) {
             console.log("[Magellan Print] printReceipt called");
+            console.log("[Magellan Print] Receipt type:", typeof receipt);
+            console.log("[Magellan Print] Receipt is Element:", receipt instanceof Element);
 
             try {
-                // Get current order from POS environment
-                if (!POS_ENV) {
-                    throw new Error("POS environment not available");
+                let escposData;
+
+                // Check if we have stored receipt data from the print call
+                if (lastReceiptData && lastReceiptData.orderlines && lastReceiptData.orderlines.length > 0) {
+                    console.log("[Magellan Print] Using stored receipt export data");
+                    escposData = buildEscposFromExportData(lastReceiptData);
+                } else if (receipt instanceof Element || receipt instanceof HTMLElement) {
+                    // Parse the HTML element
+                    console.log("[Magellan Print] Parsing HTML element...");
+                    console.log("[Magellan Print] HTML preview:", receipt.outerHTML.substring(0, 500));
+                    escposData = parseHtmlToEscpos(receipt);
+                } else if (typeof receipt === 'string') {
+                    // It's HTML string - parse it
+                    console.log("[Magellan Print] Parsing HTML string...");
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(receipt, 'text/html');
+                    escposData = parseHtmlToEscpos(doc.body);
+                } else {
+                    console.error("[Magellan Print] Unknown receipt type:", typeof receipt);
+                    throw new Error("Invalid receipt format");
                 }
 
-                // Get the current order
-                let order = null;
-                if (typeof POS_ENV.get_order === 'function') {
-                    order = POS_ENV.get_order();
-                } else if (POS_ENV.selectedOrder) {
-                    order = POS_ENV.selectedOrder;
-                } else if (POS_ENV.orders && POS_ENV.orders.length > 0) {
-                    // Get the last/current order
-                    order = POS_ENV.orders[POS_ENV.orders.length - 1];
-                }
+                console.log("[Magellan Print] ESC/POS data preview:", escposData.substring(0, 400));
+                console.log("[Magellan Print] Sending", escposData.length, "bytes to printer");
 
-                if (!order) {
-                    console.warn("[Magellan Print] No active order found");
-                    throw new Error("No active order found");
-                }
-
-                console.log("[Magellan Print] Building receipt from order:", order.name || order.uid);
-
-                // Build ESC/POS data directly from order model
-                const data = buildEscposFromOrder(POS_ENV, order);
-
-                console.log("[Magellan Print] ESC/POS data preview:", data.substring(0, 300));
-                console.log("[Magellan Print] Sending", data.length, "bytes to printer");
-
-                await sendToPrinter(data);
+                await sendToPrinter(escposData);
 
                 console.log("[Magellan Print] ✅ Print successful");
                 return { successful: true };
@@ -525,12 +612,12 @@ const magellanPrintService = {
     dependencies: ["pos", "printer", "hardware_proxy"],
 
     start(env, { pos, printer, hardware_proxy }) {
-        console.log("[Magellan Print] Service starting (ORDER MODEL VERSION)");
+        console.log("[Magellan Print] Service starting (HTML PARSER VERSION)");
         console.log("[Magellan Print] POS available:", !!pos);
         console.log("[Magellan Print] Printer service available:", !!printer);
         console.log("[Magellan Print] Hardware proxy available:", !!hardware_proxy);
 
-        // Store POS environment globally for use in printReceipt
+        // Store POS environment globally
         POS_ENV = pos;
 
         // Get bridge URL from POS config
@@ -552,11 +639,33 @@ const magellanPrintService = {
             console.log("[Magellan Print] ✅ hardware_proxy.printer set");
         }
 
-        // Method 2: Also set on printer service directly
+        // Method 2: Override the printer service's print method to capture receipt data
         if (printer) {
             console.log("[Magellan Print] Setting printer.device to Magellan device");
             printer.setPrinter(magellanDevice);
             console.log("[Magellan Print] ✅ printer.device set");
+
+            // Patch the print method to capture receipt data before rendering
+            const originalPrint = printer.print.bind(printer);
+            printer.print = async function(component, props, options) {
+                // Capture the receipt data before it gets rendered
+                if (props && props.data) {
+                    console.log("[Magellan Print] Captured receipt export data");
+                    console.log("[Magellan Print] - Order name:", props.data.name);
+                    console.log("[Magellan Print] - Orderlines count:", props.data.orderlines?.length || 0);
+                    console.log("[Magellan Print] - Amount total:", props.data.amount_total);
+                    console.log("[Magellan Print] - Cashier:", props.data.cashier);
+                    if (props.data.orderlines && props.data.orderlines.length > 0) {
+                        console.log("[Magellan Print] - First line:", JSON.stringify(props.data.orderlines[0]));
+                    }
+                    lastReceiptData = props.data;
+                } else {
+                    console.log("[Magellan Print] No props.data in print call");
+                    lastReceiptData = null;
+                }
+                return originalPrint(component, props, options);
+            };
+            console.log("[Magellan Print] ✅ Patched printer.print to capture receipt data");
         }
 
         // Test connectivity asynchronously
@@ -582,4 +691,4 @@ const magellanPrintService = {
 // Register the service
 registry.category("services").add("magellan_print", magellanPrintService);
 
-console.log("[Magellan Print] Service registered (ORDER MODEL VERSION)");
+console.log("[Magellan Print] Service registered (HTML PARSER VERSION)");
