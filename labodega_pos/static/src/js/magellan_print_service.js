@@ -18,6 +18,8 @@ const ESC = '\x1b';
 const GS = '\x1d';
 const COMMANDS = {
     INIT: ESC + '@',                    // Initialize printer
+    FONT_A: ESC + 'M' + '\x00',         // Select Font A (12x24, 48 chars/line on 80mm)
+    FONT_B: ESC + 'M' + '\x01',         // Select Font B (9x17, 64 chars/line on 80mm)
     BOLD_ON: ESC + 'E' + '\x01',        // Bold on
     BOLD_OFF: ESC + 'E' + '\x00',       // Bold off
     ALIGN_LEFT: ESC + 'a' + '\x00',     // Left align
@@ -37,8 +39,8 @@ const COMMANDS = {
     OPEN_DRAWER: ESC + 'p' + '\x00' + '\x19' + '\x19',  // Open cash drawer
 };
 
-// Receipt width in characters (48 for 80mm paper at standard font)
-const RECEIPT_WIDTH = 48;
+// Receipt width in characters (42 is safer for 80mm paper with margins)
+const RECEIPT_WIDTH = 42;
 
 // Store bridge URL globally
 let bridgeUrl = null;
@@ -97,6 +99,7 @@ function getTextContent(element) {
  */
 function parseHtmlToEscpos(receiptElement) {
     let output = COMMANDS.INIT;
+    output += COMMANDS.FONT_A;  // Use standard font for consistent width
 
     console.log("[Magellan Print] Parsing HTML receipt (Odoo 18 structure)...");
     console.log("[Magellan Print] Full HTML:", receiptElement.outerHTML.substring(0, 2000));
@@ -217,20 +220,17 @@ function parseHtmlToEscpos(receiptElement) {
         console.log("[Magellan Print] Line:", { productName, price, qty });
 
         if (productName) {
-            // Format: Product Name (with qty if not 1)          Price
-            let displayName = productName;
-            if (qty && qty !== '1' && qty !== '1.00') {
-                displayName += ` x${qty}`;
-            }
-            output += formatLine(displayName, price) + '\n';
+            // Product name and price on one line (formatLine handles truncation)
+            output += formatLine(productName, price) + '\n';
 
-            // Show unit price breakdown if qty > 1
-            if (pricePerUnitEl && qty && qty !== '1') {
+            // Qty breakdown on separate indented line if qty > 1
+            const qtyNum = parseFloat(qty) || 1;
+            if (qtyNum !== 1 && pricePerUnitEl) {
                 const pricePerUnitText = getTextContent(pricePerUnitEl);
                 // Extract just the unit price part
-                const unitPriceMatch = pricePerUnitText.match(/x\s*([\$€£]?\s*[\d,.]+)/);
+                const unitPriceMatch = pricePerUnitText.match(/[\$€£]?\s*[\d,.]+/);
                 if (unitPriceMatch) {
-                    output += `  ${qty} @ ${unitPriceMatch[1]}\n`;
+                    output += `  ${qty} x ${unitPriceMatch[0].trim()}\n`;
                 }
             }
         }
@@ -322,6 +322,7 @@ function parseHtmlToEscpos(receiptElement) {
  */
 function buildEscposFromExportData(data) {
     let output = COMMANDS.INIT;
+    output += COMMANDS.FONT_A;  // Use standard font for consistent width
 
     console.log("[Magellan Print] Building from export data...", data);
 
