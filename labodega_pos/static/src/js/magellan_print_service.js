@@ -13,34 +13,34 @@ import { getBridgeUrl } from "./magellan_config";
 
 console.log("[Magellan Print] magellan_print_service.js loaded (HTML PARSER VERSION)");
 
-// ESC/POS Commands
+// ESC/POS Commands - Using codes compatible with Epson thermal printers
 const ESC = '\x1b';
 const GS = '\x1d';
 const COMMANDS = {
     INIT: ESC + '@',                    // Initialize printer
-    FONT_A: ESC + 'M' + '\x00',         // Select Font A (12x24, 48 chars/line on 80mm)
-    FONT_B: ESC + 'M' + '\x01',         // Select Font B (9x17, 64 chars/line on 80mm)
-    BOLD_ON: ESC + 'E' + '\x01',        // Bold on
-    BOLD_OFF: ESC + 'E' + '\x00',       // Bold off
-    ALIGN_LEFT: ESC + 'a' + '\x00',     // Left align
-    ALIGN_CENTER: ESC + 'a' + '\x01',   // Center align
-    ALIGN_RIGHT: ESC + 'a' + '\x02',    // Right align
-    DOUBLE_HEIGHT: ESC + '!' + '\x10',  // Double height
-    DOUBLE_WIDTH: ESC + '!' + '\x20',   // Double width
-    DOUBLE_ON: ESC + '!' + '\x30',      // Double height + width
-    NORMAL: ESC + '!' + '\x00',         // Normal size
-    UNDERLINE_ON: ESC + '-' + '\x01',   // Underline on
-    UNDERLINE_OFF: ESC + '-' + '\x00',  // Underline off
-    CUT: GS + 'V' + '\x00',             // Full cut
-    PARTIAL_CUT: GS + 'V' + '\x01',     // Partial cut
+    FONT_A: ESC + 'M\x00',              // Select Font A (standard)
+    FONT_B: ESC + 'M\x01',              // Select Font B (condensed)
+    BOLD_ON: ESC + 'E\x01',             // Bold on
+    BOLD_OFF: ESC + 'E\x00',            // Bold off
+    ALIGN_LEFT: ESC + 'a\x00',          // Left align
+    ALIGN_CENTER: ESC + 'a\x01',        // Center align
+    ALIGN_RIGHT: ESC + 'a\x02',         // Right align
+    DOUBLE_HEIGHT: ESC + '!\x10',       // Double height only
+    DOUBLE_WIDTH: ESC + '!\x20',        // Double width only
+    DOUBLE_ON: ESC + '!\x30',           // Double height + width
+    NORMAL: ESC + '!\x00',              // Normal size (reset)
+    UNDERLINE_ON: ESC + '-\x01',        // Underline on
+    UNDERLINE_OFF: ESC + '-\x00',       // Underline off
+    CUT: GS + 'V\x00',                  // Full cut
+    PARTIAL_CUT: GS + 'V\x01',          // Partial cut
     FEED_1: '\n',                       // Feed 1 line
     FEED_3: '\n\n\n',                   // Feed 3 lines
     FEED_5: '\n\n\n\n\n',               // Feed 5 lines
-    OPEN_DRAWER: ESC + 'p' + '\x00' + '\x19' + '\x19',  // Open cash drawer
+    OPEN_DRAWER: ESC + 'p\x00\x19\x19', // Open cash drawer
 };
 
-// Receipt width in characters (42 is safer for 80mm paper with margins)
-const RECEIPT_WIDTH = 42;
+// Receipt width in characters (40 for 80mm paper with safe margins)
+const RECEIPT_WIDTH = 40;
 
 // Store bridge URL globally
 let bridgeUrl = null;
@@ -60,7 +60,7 @@ function formatLine(left, right, width = RECEIPT_WIDTH) {
 
     // Truncate left side if too long
     if (left.length > maxLeftLen) {
-        left = left.substring(0, maxLeftLen - 1) + '…';
+        left = left.substring(0, maxLeftLen - 2) + '..';
     }
 
     const padding = width - left.length - right.length;
@@ -463,9 +463,12 @@ async function sendToPrinter(data) {
     try {
         console.log("[Magellan Print] Sending to printer:", bridgeUrl, "Data length:", data.length);
 
-        // Convert string to Uint8Array for proper byte transmission
-        const encoder = new TextEncoder();
-        const bytes = encoder.encode(data);
+        // Convert string to bytes directly (Latin-1/ISO-8859-1 encoding for ESC/POS)
+        // This preserves single-byte characters correctly for thermal printers
+        const bytes = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) {
+            bytes[i] = data.charCodeAt(i) & 0xFF;
+        }
 
         console.log("[Magellan Print] Encoded bytes:", bytes.length);
 
