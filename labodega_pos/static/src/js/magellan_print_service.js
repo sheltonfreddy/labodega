@@ -46,13 +46,15 @@ let POS_ENV = null;
 
 /**
  * Format a two-column line (left-aligned text, right-aligned value)
+ * Ensures proper alignment with minimum gap between columns
  */
 function formatLine(left, right, width = RECEIPT_WIDTH) {
     left = String(left || '');
     right = String(right || '');
 
     const rightLen = right.length;
-    const maxLeftLen = width - rightLen - 1;
+    const minGap = 2; // Minimum space between left and right columns
+    const maxLeftLen = width - rightLen - minGap;
 
     // Truncate left side if too long
     if (left.length > maxLeftLen) {
@@ -60,7 +62,7 @@ function formatLine(left, right, width = RECEIPT_WIDTH) {
     }
 
     const padding = width - left.length - right.length;
-    return left + ' '.repeat(Math.max(1, padding)) + right;
+    return left + ' '.repeat(Math.max(minGap, padding)) + right;
 }
 
 /**
@@ -382,18 +384,14 @@ function buildEscposFromExportData(data) {
 
         console.log("[Magellan Print] Processing line:", { name, qty, priceStr, unitPriceStr });
 
-        // Product name with qty if > 1
-        let displayName = name;
         const qtyNum = parseFloat(qty) || 1;
-        if (qtyNum !== 1) {
-            displayName += ` x${qty}`;
-        }
 
-        output += formatLine(displayName, priceStr) + '\n';
+        // First line: Product name and total price (name truncated if needed)
+        output += formatLine(name, priceStr) + '\n';
 
-        // Show unit price breakdown if qty > 1
+        // Second line: qty x unit price (only if qty > 1)
         if (qtyNum !== 1 && unitPriceStr) {
-            output += `  ${qty} @ ${unitPriceStr}\n`;
+            output += `  ${qty} x ${unitPriceStr}\n`;
         }
     }
 
