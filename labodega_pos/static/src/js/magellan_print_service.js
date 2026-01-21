@@ -47,12 +47,33 @@ let bridgeUrl = null;
 let POS_ENV = null;
 
 /**
+ * Clean a string for thermal printer output
+ * Replaces non-breaking spaces and other Unicode characters with ASCII equivalents
+ */
+function cleanForPrinter(str) {
+    if (!str) return '';
+    return String(str)
+        // Replace non-breaking space (U+00A0) with regular space
+        .replace(/\u00A0/g, ' ')
+        // Replace other common Unicode spaces
+        .replace(/[\u2000-\u200B\u202F\u205F\u3000]/g, ' ')
+        // Replace en-dash and em-dash with hyphen
+        .replace(/[\u2013\u2014]/g, '-')
+        // Replace smart quotes with regular quotes
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        // Remove any remaining non-ASCII characters that might cause issues
+        .replace(/[^\x00-\x7F]/g, '');
+}
+
+/**
  * Format a two-column line (left-aligned text, right-aligned value)
  * Ensures proper alignment with minimum gap between columns
  */
 function formatLine(left, right, width = RECEIPT_WIDTH) {
-    left = String(left || '');
-    right = String(right || '');
+    // Clean both strings for printer compatibility
+    left = cleanForPrinter(String(left || ''));
+    right = cleanForPrinter(String(right || ''));
 
     const rightLen = right.length;
     const minGap = 2; // Minimum space between left and right columns
@@ -71,7 +92,7 @@ function formatLine(left, right, width = RECEIPT_WIDTH) {
  * Center text within receipt width
  */
 function centerText(text, width = RECEIPT_WIDTH) {
-    text = String(text || '');
+    text = cleanForPrinter(String(text || ''));
     if (text.length >= width) return text.substring(0, width);
     const padding = Math.floor((width - text.length) / 2);
     return ' '.repeat(padding) + text;
@@ -86,11 +107,13 @@ function separator(char = '-', width = RECEIPT_WIDTH) {
 
 /**
  * Extract text content from an element, handling nested elements
+ * Also cleans for printer compatibility
  */
 function getTextContent(element) {
     if (!element) return '';
-    // Get text content, normalize whitespace
-    return (element.textContent || element.innerText || '').replace(/\s+/g, ' ').trim();
+    // Get text content, normalize whitespace, and clean for printer
+    const text = (element.textContent || element.innerText || '').replace(/\s+/g, ' ').trim();
+    return cleanForPrinter(text);
 }
 
 /**
@@ -332,18 +355,18 @@ function buildEscposFromExportData(data) {
     output += COMMANDS.DOUBLE_HEIGHT;
 
     const companyName = data.headerData?.company?.name || data.company?.name || 'LA BODEGA';
-    output += companyName + '\n';
+    output += cleanForPrinter(companyName) + '\n';
     output += COMMANDS.NORMAL;
     output += COMMANDS.BOLD_OFF;
 
     // Company info from headerData
     if (data.headerData?.company) {
         const c = data.headerData.company;
-        if (c.street) output += c.street + '\n';
+        if (c.street) output += cleanForPrinter(c.street) + '\n';
         if (c.city || c.state || c.zip) {
-            output += [c.city, c.state, c.zip].filter(Boolean).join(', ') + '\n';
+            output += cleanForPrinter([c.city, c.state, c.zip].filter(Boolean).join(', ')) + '\n';
         }
-        if (c.phone) output += 'Tel: ' + c.phone + '\n';
+        if (c.phone) output += 'Tel: ' + cleanForPrinter(c.phone) + '\n';
     }
 
     output += COMMANDS.ALIGN_LEFT;
@@ -392,7 +415,7 @@ function buildEscposFromExportData(data) {
 
         // Second line: qty x unit price (only if qty > 1)
         if (qtyNum !== 1 && unitPriceStr) {
-            output += `  ${qty} x ${unitPriceStr}\n`;
+            output += `  ${cleanForPrinter(qty)} x ${cleanForPrinter(unitPriceStr)}\n`;
         }
     }
 
@@ -437,7 +460,7 @@ function buildEscposFromExportData(data) {
     output += COMMANDS.ALIGN_CENTER;
 
     if (data.footer) {
-        output += data.footer + '\n';
+        output += cleanForPrinter(data.footer) + '\n';
     }
 
     output += COMMANDS.BOLD_ON;
