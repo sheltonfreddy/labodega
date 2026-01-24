@@ -32,7 +32,8 @@ SERVER_HOST = "0.0.0.0"        # Listen on all interfaces
 SERVER_PORT = 8000              # Port for the HTTP API
 
 # Printer settings
-PRINTER_NAME = "epson_pos"      # CUPS printer name (check with: lpstat -p)
+PRINTER_NAME = "epson_pos"      # CUPS printer name (fallback, check with: lpstat -p)
+PRINTER_DEVICE = "/dev/usb/lp0" # Direct USB device path (preferred, faster)
 CASH_DRAWER_OPEN_CMD = b'\x1b\x70\x00\x19\x19'  # ESC/POS command to open cash drawer
 
 # ============================================================================
@@ -313,6 +314,7 @@ def get_weight():
 async def print_raw(request: Request):
     """
     Print raw ESC/POS data to the receipt printer.
+    Uses direct device write for speed (bypasses CUPS).
 
     Request body: Raw binary data (ESC/POS commands)
     Response: {"status": "printed"} or {"status": "error", "message": "..."}
@@ -323,7 +325,20 @@ async def print_raw(request: Request):
         if not data:
             return {"status": "error", "message": "No data received"}
 
-        # Write to temp file and print via CUPS
+        # Try direct device write first (fastest)
+        if os.path.exists(PRINTER_DEVICE):
+            try:
+                with open(PRINTER_DEVICE, 'wb') as printer:
+                    printer.write(data)
+                    printer.flush()
+                print(f"[PRINT] Direct print sent ({len(data)} bytes)")
+                return {"status": "printed", "bytes": len(data)}
+            except PermissionError:
+                print(f"[PRINT] Permission denied on {PRINTER_DEVICE}, falling back to CUPS")
+            except Exception as e:
+                print(f"[PRINT] Direct print failed: {e}, falling back to CUPS")
+
+        # Fallback to CUPS if direct write fails
         with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
             f.write(data)
             temp_path = f.name
@@ -331,20 +346,22 @@ async def print_raw(request: Request):
         try:
             result = subprocess.run(
                 ["lp", "-d", PRINTER_NAME, "-o", "raw", temp_path],
-                capture_output=True,
-                text=True,
+                capture_output=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 timeout=10
             )
 
             if result.returncode != 0:
-                print(f"[PRINT] Error: {result.stderr}")
-                return {"status": "error", "message": result.stderr}
+                error_msg = result.stderr.decode() if result.stderr else "Unknown error"
+                print(f"[PRINT] CUPS Error: {error_msg}")
+                return {"status": "error", "message": error_msg}
 
-            print(f"[PRINT] Raw print job sent ({len(data)} bytes)")
+            print(f"[PRINT] CUPS print job sent ({len(data)} bytes)")
             return {"status": "printed", "bytes": len(data)}
 
         finally:
-            # Clean up temp file
             try:
                 os.unlink(temp_path)
             except Exception:
@@ -360,6 +377,7 @@ async def print_receipt(request: Request):
     """
     Print a receipt from HTML or text content.
     Converts to ESC/POS format for thermal printer.
+    Uses direct device write for speed (bypasses CUPS).
 
     Request body: JSON with {"content": "receipt text or html", "cut": true}
     Response: {"status": "printed"} or {"status": "error", "message": "..."}
@@ -406,7 +424,20 @@ async def print_receipt(request: Request):
         if open_drawer:
             esc_data.extend(CASH_DRAWER_OPEN_CMD)
 
-        # Print via CUPS
+        # Try direct device write first (fastest)
+        if os.path.exists(PRINTER_DEVICE):
+            try:
+                with open(PRINTER_DEVICE, 'wb') as printer:
+                    printer.write(esc_data)
+                    printer.flush()
+                print(f"[PRINT] Direct receipt print ({len(esc_data)} bytes)")
+                return {"status": "printed", "bytes": len(esc_data)}
+            except PermissionError:
+                print(f"[PRINT] Permission denied on {PRINTER_DEVICE}, falling back to CUPS")
+            except Exception as e:
+                print(f"[PRINT] Direct print failed: {e}, falling back to CUPS")
+
+        # Fallback to CUPS
         with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
             f.write(esc_data)
             temp_path = f.name
@@ -414,16 +445,19 @@ async def print_receipt(request: Request):
         try:
             result = subprocess.run(
                 ["lp", "-d", PRINTER_NAME, "-o", "raw", temp_path],
-                capture_output=True,
-                text=True,
+                capture_output=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 timeout=10
             )
 
             if result.returncode != 0:
-                print(f"[PRINT] Error: {result.stderr}")
-                return {"status": "error", "message": result.stderr}
+                error_msg = result.stderr.decode() if result.stderr else "Unknown error"
+                print(f"[PRINT] CUPS Error: {error_msg}")
+                return {"status": "error", "message": error_msg}
 
-            print(f"[PRINT] Receipt printed ({len(esc_data)} bytes)")
+            print(f"[PRINT] CUPS receipt printed ({len(esc_data)} bytes)")
             return {"status": "printed", "bytes": len(esc_data)}
 
         finally:
@@ -504,11 +538,25 @@ async def print_image(request: Request):
 async def open_drawer():
     """
     Open the cash drawer connected to the printer.
+    Uses direct device write for speed (bypasses CUPS).
 
     Response: {"status": "opened"} or {"status": "error", "message": "..."}
     """
     try:
-        # Send cash drawer open command
+        # Try direct device write first (fastest)
+        if os.path.exists(PRINTER_DEVICE):
+            try:
+                with open(PRINTER_DEVICE, 'wb') as printer:
+                    printer.write(CASH_DRAWER_OPEN_CMD)
+                    printer.flush()
+                print("[DRAWER] Cash drawer opened (direct)")
+                return {"status": "opened"}
+            except PermissionError:
+                print(f"[DRAWER] Permission denied on {PRINTER_DEVICE}, falling back to CUPS")
+            except Exception as e:
+                print(f"[DRAWER] Direct write failed: {e}, falling back to CUPS")
+
+        # Fallback to CUPS
         with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
             f.write(CASH_DRAWER_OPEN_CMD)
             temp_path = f.name
@@ -516,16 +564,19 @@ async def open_drawer():
         try:
             result = subprocess.run(
                 ["lp", "-d", PRINTER_NAME, "-o", "raw", temp_path],
-                capture_output=True,
-                text=True,
+                capture_output=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 timeout=10
             )
 
             if result.returncode != 0:
-                print(f"[DRAWER] Error: {result.stderr}")
-                return {"status": "error", "message": result.stderr}
+                error_msg = result.stderr.decode() if result.stderr else "Unknown error"
+                print(f"[DRAWER] CUPS Error: {error_msg}")
+                return {"status": "error", "message": error_msg}
 
-            print("[DRAWER] Cash drawer opened")
+            print("[DRAWER] Cash drawer opened (CUPS)")
             return {"status": "opened"}
 
         finally:
@@ -543,10 +594,33 @@ async def open_drawer():
 def printer_status():
     """
     Check printer status.
+    Checks direct device first, then CUPS as fallback.
 
     Response: {"status": "ready", "printer": "epson_pos"} or error
     """
     try:
+        # Check direct device first (preferred method)
+        if os.path.exists(PRINTER_DEVICE):
+            try:
+                # Try to open device for writing (tests availability)
+                with open(PRINTER_DEVICE, 'wb') as printer:
+                    pass  # Just test that we can open it
+                return {
+                    "status": "ready",
+                    "printer": PRINTER_DEVICE,
+                    "method": "direct",
+                    "details": f"Direct USB device {PRINTER_DEVICE} available"
+                }
+            except PermissionError:
+                return {
+                    "status": "error",
+                    "message": f"Permission denied on {PRINTER_DEVICE}. Run: sudo chmod 666 {PRINTER_DEVICE}"
+                }
+            except Exception as e:
+                # Device exists but can't open - fall through to CUPS check
+                pass
+
+        # Fallback: Check CUPS printer status
         result = subprocess.run(
             ["lpstat", "-p", PRINTER_NAME],
             capture_output=True,
@@ -560,6 +634,7 @@ def printer_status():
         return {
             "status": "ready" if is_ready else "busy",
             "printer": PRINTER_NAME,
+            "method": "cups",
             "details": output
         }
 
@@ -587,7 +662,13 @@ if __name__ == "__main__":
     print(f"Serial Port: {SERIAL_PORT}")
     print(f"Baudrate: {BAUDRATE}")
     print(f"Weight Divisor: {WEIGHT_DIVISOR}")
-    print(f"Printer: {PRINTER_NAME}")
+    print()
+    print("Printer Configuration:")
+    print(f"  Direct Device: {PRINTER_DEVICE}")
+    device_available = os.path.exists(PRINTER_DEVICE)
+    print(f"    Available: {'✓ YES (fast mode)' if device_available else '✗ NO (will use CUPS)'}")
+    print(f"  CUPS Printer: {PRINTER_NAME} (fallback)")
+    print()
     print(f"HTTP Server: {protocol}://{SERVER_HOST}:{SERVER_PORT}")
     print()
     print("SSL Certificate Check:")
