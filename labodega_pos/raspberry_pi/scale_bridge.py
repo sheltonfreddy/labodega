@@ -571,8 +571,8 @@ if __name__ == "__main__":
     import os
 
     # Check for SSL certificates
-    ssl_keyfile = os.path.expanduser("~/magellan_bridge/certs/key.pem")
-    ssl_certfile = os.path.expanduser("~/magellan_bridge/certs/cert.pem")
+    ssl_keyfile = os.path.expanduser("~/iot_bridge/certs/key.pem")
+    ssl_certfile = os.path.expanduser("~/iot_bridge/certs/cert.pem")
 
     # Check if certificates exist
     key_exists = os.path.exists(ssl_keyfile)
@@ -602,8 +602,8 @@ if __name__ == "__main__":
         print("⚠️  HTTP ONLY (no certificates found)")
         print()
         print("To enable HTTPS, generate certificates:")
-        print("  mkdir -p ~/magellan_bridge/certs")
-        print("  cd ~/magellan_bridge/certs")
+        print("  mkdir -p ~/iot_bridge/certs")
+        print("  cd ~/iot_bridge/certs")
         print("  openssl req -x509 -newkey rsa:2048 -nodes \\")
         print("    -keyout key.pem -out cert.pem -days 3650 \\")
         print("    -subj \"/CN=$(hostname -I | awk '{print $1}')\" \\")
