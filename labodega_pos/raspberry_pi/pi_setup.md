@@ -801,3 +801,828 @@ journalctl -u iot_bridge --since "1 hour ago" | grep -i error
 cd /home/labodega2
 tar -czf iot_bridge_backup_$(date +%Y%m%d).tar.gz iot_bridge/
 ```
+
+---
+
+# Part 9: Ubuntu POS Terminal Setup
+
+This section covers setting up **Ubuntu POS terminals** to run Odoo POS in Chrome kiosk mode
+with proper access to the Raspberry Pi bridge.
+
+---
+
+## 9.1 Install Google Chrome
+
+### Option A: Download from Google (Recommended)
+
+```bash
+# Download Chrome .deb package
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+
+# Install Chrome
+sudo dpkg -i google-chrome-stable_current_amd64.deb
+
+# Fix any dependency issues
+sudo apt --fix-broken install -y
+
+# Verify installation
+google-chrome --version
+```
+
+### Option B: Add Google Chrome Repository
+
+```bash
+# Add Google signing key
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+
+# Add repository
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+
+# Update and install
+sudo apt update
+sudo apt install -y google-chrome-stable
+```
+
+---
+
+## 9.2 Install Required Dependencies
+
+```bash
+sudo apt update
+sudo apt install -y \
+  xdotool \
+  unclutter \
+  x11-xserver-utils \
+  curl \
+  ca-certificates
+```
+
+---
+
+## 9.3 Trust the Pi's SSL Certificate (Optional but Recommended)
+
+Copy the Pi's self-signed certificate and add to system trust store:
+
+```bash
+# Copy certificate from Pi
+scp labodega2@<PI_IP>:/home/labodega2/iot_bridge/certs/cert.pem /tmp/pi-bridge.pem
+
+# Add to system trust store
+sudo cp /tmp/pi-bridge.pem /usr/local/share/ca-certificates/pi-bridge.crt
+sudo update-ca-certificates
+
+# Verify
+ls -la /usr/local/share/ca-certificates/
+```
+
+> **Note:** Even with system trust, Chrome kiosk mode uses `--ignore-certificate-errors` 
+> to ensure no SSL warnings interrupt the POS workflow.
+
+---
+
+## 9.4 Chrome POS Kiosk Launch Command
+
+The key command to launch Chrome in POS kiosk mode:
+
+```bash
+google-chrome \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults \
+  --user-data-dir=$HOME/.config/chrome-pos \
+  --kiosk \
+  "https://erp.labodegacalhoun.com/pos/web?config_id=2" &
+```
+
+### Explanation of Flags:
+
+| Flag | Purpose |
+|------|---------|
+| `--ignore-certificate-errors` | Accept self-signed SSL certificate from Pi |
+| `--disable-web-security` | Allow cross-origin requests to Pi |
+| `--disable-features=PrivateNetworkAccess*` | Allow HTTPS page to access local network (Pi) |
+| `--user-data-dir=$HOME/.config/chrome-pos` | Separate Chrome profile for POS |
+| `--kiosk` | Full-screen kiosk mode (no browser UI) |
+
+### Additional Useful Flags:
+
+```bash
+# Full command with all recommended flags
+google-chrome \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults \
+  --user-data-dir=$HOME/.config/chrome-pos \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-restore-session-state \
+  --no-first-run \
+  --start-fullscreen \
+  "https://erp.labodegacalhoun.com/pos/web?config_id=2" &
+```
+
+---
+
+## 9.5 Exiting Kiosk Mode
+
+Kiosk mode hides all browser UI. To exit:
+
+### Method 1: Keyboard Shortcut
+- Press `Alt + F4` to close Chrome
+
+### Method 2: Switch to Another TTY
+- Press `Ctrl + Alt + F2` to switch to TTY2
+- Login and run: `pkill chrome`
+- Press `Ctrl + Alt + F1` (or F7) to return to desktop
+
+### Method 3: From SSH
+```bash
+ssh user@<POS_TERMINAL_IP>
+pkill chrome
+```
+
+---
+
+## 9.6 Create Desktop Shortcut
+
+Create a desktop launcher for the POS kiosk:
+
+```bash
+mkdir -p ~/Desktop
+
+cat > ~/Desktop/odoo-pos.desktop << 'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Odoo POS
+Comment=Launch Odoo Point of Sale
+Icon=google-chrome
+Exec=/bin/bash -c 'google-chrome --ignore-certificate-errors --disable-web-security --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults --user-data-dir=$HOME/.config/chrome-pos --kiosk --noerrdialogs --disable-infobars --no-first-run "https://erp.labodegacalhoun.com/pos/web?config_id=2"'
+Terminal=false
+Categories=Application;
+EOF
+
+# Make executable
+chmod +x ~/Desktop/odoo-pos.desktop
+
+# Trust the desktop file (GNOME)
+gio set ~/Desktop/odoo-pos.desktop metadata::trusted true
+```
+
+### For Different POS Configs
+
+If you have multiple POS terminals with different configs, change `config_id`:
+
+```bash
+# Terminal 1 (config_id=2)
+"https://erp.labodegacalhoun.com/pos/web?config_id=2"
+
+# Terminal 2 (config_id=3)
+"https://erp.labodegacalhoun.com/pos/web?config_id=3"
+```
+
+---
+
+## 9.7 Auto-Start POS on Login (Optional)
+
+### Option A: Autostart Directory
+
+```bash
+mkdir -p ~/.config/autostart
+
+cat > ~/.config/autostart/odoo-pos.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Odoo POS Kiosk
+Exec=/bin/bash -c 'sleep 5 && google-chrome --ignore-certificate-errors --disable-web-security --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults --user-data-dir=$HOME/.config/chrome-pos --kiosk --noerrdialogs --disable-infobars --no-first-run "https://erp.labodegacalhoun.com/pos/web?config_id=2"'
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+EOF
+```
+
+> The `sleep 5` ensures the desktop is fully loaded before launching Chrome.
+
+### Option B: Systemd User Service
+
+```bash
+mkdir -p ~/.config/systemd/user
+
+cat > ~/.config/systemd/user/odoo-pos.service << 'EOF'
+[Unit]
+Description=Odoo POS Chrome Kiosk
+After=graphical-session.target
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+ExecStartPre=/bin/sleep 10
+ExecStart=/usr/bin/google-chrome --ignore-certificate-errors --disable-web-security --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults --user-data-dir=%h/.config/chrome-pos --kiosk --noerrdialogs --disable-infobars --no-first-run "https://erp.labodegacalhoun.com/pos/web?config_id=2"
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Enable the service
+systemctl --user daemon-reload
+systemctl --user enable odoo-pos.service
+```
+
+---
+
+## 9.8 Create POS Launch Script
+
+For more control, create a dedicated launch script:
+
+```bash
+sudo tee /usr/local/bin/pos-kiosk << 'EOF'
+#!/bin/bash
+
+# POS Kiosk Launch Script
+# Usage: pos-kiosk [config_id]
+
+CONFIG_ID=${1:-2}
+ODOO_URL="https://erp.labodegacalhoun.com/pos/web?config_id=${CONFIG_ID}"
+CHROME_PROFILE="$HOME/.config/chrome-pos-${CONFIG_ID}"
+
+# Kill any existing Chrome POS instances
+pkill -f "chrome-pos" 2>/dev/null
+sleep 1
+
+# Launch Chrome in kiosk mode
+exec google-chrome \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults \
+  --user-data-dir="$CHROME_PROFILE" \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --no-first-run \
+  "$ODOO_URL"
+EOF
+
+sudo chmod +x /usr/local/bin/pos-kiosk
+```
+
+Usage:
+```bash
+# Launch with default config (config_id=2)
+pos-kiosk
+
+# Launch with specific config
+pos-kiosk 3
+```
+
+---
+
+## 9.9 Hide Mouse Cursor (Optional)
+
+For a cleaner kiosk experience, hide the mouse cursor when idle:
+
+```bash
+# Install unclutter
+sudo apt install -y unclutter
+
+# Add to autostart
+cat > ~/.config/autostart/unclutter.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Unclutter
+Exec=unclutter -idle 3
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+EOF
+```
+
+---
+
+## 9.10 Disable Screen Blanking/Power Management
+
+Prevent the screen from turning off during operation:
+
+```bash
+# Disable screen blanking (X11)
+xset s off
+xset -dpms
+xset s noblank
+
+# Make persistent - add to ~/.xprofile
+cat >> ~/.xprofile << 'EOF'
+# Disable screen blanking for POS
+xset s off
+xset -dpms
+xset s noblank
+EOF
+```
+
+For GNOME:
+```bash
+# Disable automatic screen lock
+gsettings set org.gnome.desktop.screensaver lock-enabled false
+gsettings set org.gnome.desktop.session idle-delay 0
+
+# Disable screen blank
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
+```
+
+---
+
+## 9.11 Firewall Configuration (If Using UFW)
+
+```bash
+# Allow outbound HTTPS to Odoo server
+# (usually allowed by default)
+
+# Allow outbound to Pi bridge (if needed)
+sudo ufw allow out to <PI_IP> port 8443
+```
+
+---
+
+## 9.12 Ubuntu Terminal Quick Setup Script
+
+Run this on a fresh Ubuntu POS terminal to set everything up:
+
+```bash
+#!/bin/bash
+# Ubuntu POS Terminal Setup Script
+
+set -e
+
+echo "=== Installing Google Chrome ==="
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt --fix-broken install -y
+rm google-chrome-stable_current_amd64.deb
+
+echo "=== Installing dependencies ==="
+sudo apt update
+sudo apt install -y xdotool unclutter curl
+
+echo "=== Creating POS kiosk script ==="
+sudo tee /usr/local/bin/pos-kiosk << 'SCRIPT'
+#!/bin/bash
+CONFIG_ID=${1:-2}
+ODOO_URL="https://erp.labodegacalhoun.com/pos/web?config_id=${CONFIG_ID}"
+pkill -f "chrome-pos" 2>/dev/null; sleep 1
+exec google-chrome \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults \
+  --user-data-dir="$HOME/.config/chrome-pos-${CONFIG_ID}" \
+  --kiosk --noerrdialogs --disable-infobars --no-first-run \
+  "$ODOO_URL"
+SCRIPT
+sudo chmod +x /usr/local/bin/pos-kiosk
+
+echo "=== Creating desktop shortcut ==="
+mkdir -p ~/Desktop
+cat > ~/Desktop/odoo-pos.desktop << 'DESKTOP'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Odoo POS
+Icon=google-chrome
+Exec=pos-kiosk 2
+Terminal=false
+DESKTOP
+chmod +x ~/Desktop/odoo-pos.desktop
+
+echo "=== Disabling screen blanking ==="
+gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || true
+gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null || true
+
+echo "=== Setup complete! ==="
+echo "Run 'pos-kiosk' or double-click the desktop shortcut to launch POS"
+```
+
+Save as `setup-pos-terminal.sh` and run:
+```bash
+chmod +x setup-pos-terminal.sh
+./setup-pos-terminal.sh
+```
+
+---
+
+## 9.13 Troubleshooting Ubuntu Terminal
+
+### Chrome won't launch
+```bash
+# Check if Chrome is installed
+which google-chrome
+google-chrome --version
+
+# Check for errors
+google-chrome --disable-gpu 2>&1 | head -20
+```
+
+### Certificate errors in browser
+```bash
+# Re-import Pi certificate
+scp labodega2@<PI_IP>:/home/labodega2/iot_bridge/certs/cert.pem /tmp/
+sudo cp /tmp/cert.pem /usr/local/share/ca-certificates/pi-bridge.crt
+sudo update-ca-certificates
+```
+
+### Private Network Access blocked
+Ensure Chrome flags are correct:
+```bash
+--disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults
+```
+
+### Can't exit kiosk mode
+```bash
+# From another terminal or SSH
+pkill chrome
+# Or press Alt+F4
+```
+
+### Screen keeps turning off
+```bash
+xset q | grep -A2 "Screen Saver"
+# If enabled, run:
+xset s off && xset -dpms
+```
+
+---
+
+## 9.14 Minimal Ubuntu Setup (Performance Optimization)
+
+For best POS kiosk performance, remove unnecessary software and disable background services.
+
+### Remove Unnecessary Pre-installed Software
+
+```bash
+# Remove snap packages (heavy, slow)
+sudo snap remove firefox
+sudo snap remove snap-store
+sudo snap remove gnome-*
+sudo snap remove gtk-common-themes
+sudo snap remove snapd-desktop-integration
+
+# Completely remove snapd (optional but recommended)
+sudo systemctl stop snapd
+sudo systemctl disable snapd
+sudo apt remove --purge snapd -y
+sudo rm -rf ~/snap /snap /var/snap /var/lib/snapd
+
+# Prevent snapd from being reinstalled
+sudo tee /etc/apt/preferences.d/no-snap.pref << 'EOF'
+Package: snapd
+Pin: release a=*
+Pin-Priority: -10
+EOF
+```
+
+### Remove Unnecessary Desktop Applications
+
+```bash
+# Remove office suite, games, and utilities not needed for POS
+sudo apt remove --purge -y \
+  libreoffice* \
+  thunderbird* \
+  rhythmbox* \
+  totem* \
+  shotwell* \
+  cheese* \
+  gnome-mahjongg \
+  gnome-mines \
+  gnome-sudoku \
+  aisleriot \
+  transmission-* \
+  deja-dup \
+  simple-scan \
+  gnome-weather \
+  gnome-maps \
+  gnome-contacts \
+  gnome-calendar \
+  gnome-clocks \
+  gnome-characters \
+  gnome-font-viewer \
+  gnome-logs \
+  gnome-power-manager \
+  gnome-screenshot \
+  gnome-system-monitor \
+  gnome-disk-utility \
+  baobab \
+  eog \
+  evince \
+  gedit \
+  seahorse \
+  remmina* \
+  usb-creator-gtk \
+  gnome-todo \
+  gnome-music
+
+# Clean up
+sudo apt autoremove -y
+sudo apt autoclean
+```
+
+### Disable Unnecessary System Services
+
+```bash
+# Disable Bluetooth (if not needed)
+sudo systemctl stop bluetooth
+sudo systemctl disable bluetooth
+
+# Disable printing services (using direct USB instead)
+# Skip this if you need CUPS as fallback
+# sudo systemctl stop cups cups-browsed
+# sudo systemctl disable cups cups-browsed
+
+# Disable location services
+sudo systemctl stop geoclue
+sudo systemctl disable geoclue
+
+# Disable evolution data server (calendar/contacts sync)
+sudo systemctl --user stop evolution-addressbook-factory
+sudo systemctl --user stop evolution-calendar-factory
+sudo systemctl --user stop evolution-source-registry
+sudo systemctl --user disable evolution-addressbook-factory
+sudo systemctl --user disable evolution-calendar-factory
+sudo systemctl --user disable evolution-source-registry
+
+# Disable tracker (file indexing - big performance hit)
+systemctl --user mask tracker-store.service
+systemctl --user mask tracker-miner-fs.service
+systemctl --user mask tracker-miner-rss.service
+systemctl --user mask tracker-extract.service
+systemctl --user mask tracker-miner-apps.service
+systemctl --user mask tracker-writeback.service
+tracker reset --hard 2>/dev/null || true
+
+# Disable remote desktop
+sudo systemctl stop gnome-remote-desktop
+sudo systemctl disable gnome-remote-desktop
+
+# Disable automatic updates popup
+sudo systemctl stop unattended-upgrades
+sudo systemctl disable unattended-upgrades
+sudo apt remove --purge update-notifier -y
+
+# Disable error reporting
+sudo systemctl stop apport
+sudo systemctl disable apport
+sudo apt remove --purge apport -y
+```
+
+### Disable GNOME Animations and Visual Effects
+
+```bash
+# Disable animations (faster UI response)
+gsettings set org.gnome.desktop.interface enable-animations false
+
+# Reduce transparency
+gsettings set org.gnome.desktop.interface enable-hot-corners false
+
+# Disable search providers
+gsettings set org.gnome.desktop.search-providers disable-external true
+
+# Disable recent files tracking
+gsettings set org.gnome.desktop.privacy remember-recent-files false
+gsettings set org.gnome.desktop.privacy recent-files-max-age 0
+
+# Disable trash auto-empty prompt
+gsettings set org.gnome.desktop.privacy remove-old-trash-files true
+gsettings set org.gnome.desktop.privacy remove-old-temp-files true
+gsettings set org.gnome.desktop.privacy old-files-age 1
+```
+
+### Disable Unnecessary Startup Applications
+
+```bash
+# Create directory if not exists
+mkdir -p ~/.config/autostart
+
+# Disable GNOME software update check
+cat > ~/.config/autostart/gnome-software-service.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=GNOME Software
+Hidden=true
+EOF
+
+# Disable online accounts
+cat > ~/.config/autostart/gnome-initial-setup-copy-worker.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=GNOME Initial Setup Copy Worker
+Hidden=true
+EOF
+
+# Disable GNOME keyring SSH agent (if not using SSH)
+cat > ~/.config/autostart/gnome-keyring-ssh.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=SSH Key Agent
+Hidden=true
+EOF
+```
+
+### Optimize Memory Usage
+
+```bash
+# Reduce swappiness (prefer RAM over swap)
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+
+# Apply immediately
+sudo sysctl vm.swappiness=10
+
+# Clear page cache periodically (optional)
+# Add to crontab: sudo crontab -e
+# 0 * * * * sync; echo 3 > /proc/sys/vm/drop_caches
+```
+
+### Install Minimal Window Manager (Alternative to GNOME)
+
+For absolute minimal setup, consider using **Openbox** instead of GNOME:
+
+```bash
+# Install minimal X and Openbox
+sudo apt install -y xorg openbox
+
+# Create autostart for Openbox
+mkdir -p ~/.config/openbox
+
+cat > ~/.config/openbox/autostart << 'EOF'
+# Disable screen blanking
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide cursor when idle
+unclutter -idle 3 &
+
+# Start Chrome kiosk
+sleep 3
+google-chrome \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults \
+  --user-data-dir=$HOME/.config/chrome-pos \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --no-first-run \
+  "https://erp.labodegacalhoun.com/pos/web?config_id=2" &
+EOF
+
+chmod +x ~/.config/openbox/autostart
+
+# Set Openbox as default session
+# Select "Openbox" at login screen
+```
+
+### Complete Minimal POS Terminal Setup Script
+
+Save as `setup-minimal-pos.sh`:
+
+```bash
+#!/bin/bash
+# Minimal Ubuntu POS Terminal Setup
+# Run with: sudo bash setup-minimal-pos.sh
+
+set -e
+
+echo "=== Removing Snap ==="
+snap list 2>/dev/null && snap remove --purge $(snap list | awk 'NR>1 {print $1}') 2>/dev/null || true
+systemctl stop snapd 2>/dev/null || true
+systemctl disable snapd 2>/dev/null || true
+apt remove --purge snapd -y 2>/dev/null || true
+rm -rf ~/snap /snap /var/snap /var/lib/snapd 2>/dev/null || true
+
+cat > /etc/apt/preferences.d/no-snap.pref << 'EOF'
+Package: snapd
+Pin: release a=*
+Pin-Priority: -10
+EOF
+
+echo "=== Removing Unnecessary Packages ==="
+apt remove --purge -y \
+  libreoffice* thunderbird* rhythmbox* totem* shotwell* cheese* \
+  gnome-mahjongg gnome-mines gnome-sudoku aisleriot transmission-* \
+  deja-dup simple-scan gnome-weather gnome-maps gnome-contacts \
+  gnome-calendar gnome-clocks gnome-characters gnome-font-viewer \
+  gnome-logs gnome-power-manager update-notifier apport 2>/dev/null || true
+
+apt autoremove -y
+apt autoclean
+
+echo "=== Disabling Unnecessary Services ==="
+systemctl stop bluetooth 2>/dev/null || true
+systemctl disable bluetooth 2>/dev/null || true
+systemctl stop geoclue 2>/dev/null || true
+systemctl disable geoclue 2>/dev/null || true
+systemctl stop apport 2>/dev/null || true
+systemctl disable apport 2>/dev/null || true
+
+echo "=== Installing Chrome ==="
+if ! command -v google-chrome &> /dev/null; then
+  wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  dpkg -i google-chrome-stable_current_amd64.deb || apt --fix-broken install -y
+  rm google-chrome-stable_current_amd64.deb
+fi
+
+echo "=== Installing Kiosk Dependencies ==="
+apt install -y unclutter xdotool
+
+echo "=== Creating POS Kiosk Script ==="
+cat > /usr/local/bin/pos-kiosk << 'SCRIPT'
+#!/bin/bash
+CONFIG_ID=${1:-2}
+ODOO_URL="https://erp.labodegacalhoun.com/pos/web?config_id=${CONFIG_ID}"
+pkill -f "chrome-pos" 2>/dev/null; sleep 1
+exec google-chrome \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults \
+  --user-data-dir="$HOME/.config/chrome-pos-${CONFIG_ID}" \
+  --kiosk --noerrdialogs --disable-infobars --no-first-run \
+  "$ODOO_URL"
+SCRIPT
+chmod +x /usr/local/bin/pos-kiosk
+
+echo "=== Optimizing System ==="
+echo 'vm.swappiness=10' >> /etc/sysctl.conf
+sysctl vm.swappiness=10
+
+echo "=== Setup Complete ==="
+echo "Reboot and run 'pos-kiosk' to start POS"
+echo "Or 'pos-kiosk 3' for config_id=3"
+```
+
+Run:
+```bash
+sudo bash setup-minimal-pos.sh
+sudo reboot
+```
+
+### Performance Monitoring
+
+Check system resources:
+
+```bash
+# Memory usage
+free -h
+
+# Running processes
+ps aux --sort=-%mem | head -20
+
+# Disk usage
+df -h
+
+# Check for heavy background processes
+top -b -n 1 | head -30
+
+# List enabled services
+systemctl list-unit-files --state=enabled
+```
+
+### Recommended Minimum Hardware
+
+For smooth POS operation:
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| CPU | Dual-core 2GHz | Quad-core 2.5GHz+ |
+| RAM | 4GB | 8GB |
+| Storage | 32GB SSD | 64GB+ SSD |
+| Display | 1024x768 | 1920x1080 |
+
+---
+
+## 9.15 Full Ubuntu POS Checklist
+
+### Initial Setup
+- [ ] Ubuntu 22.04/24.04 LTS installed
+- [ ] System updated (`sudo apt update && sudo apt upgrade -y`)
+- [ ] Snap removed (optional but recommended)
+- [ ] Unnecessary packages removed
+- [ ] Unnecessary services disabled
+
+### Chrome & Kiosk
+- [ ] Google Chrome installed
+- [ ] `pos-kiosk` script created
+- [ ] Desktop shortcut created
+- [ ] Auto-start configured (optional)
+
+### Display
+- [ ] Screen blanking disabled
+- [ ] Animations disabled
+- [ ] Mouse cursor auto-hide (unclutter)
+
+### Network
+- [ ] Pi bridge accessible (`curl -k https://<PI_IP>:8443/`)
+- [ ] Pi certificate trusted or `--ignore-certificate-errors` used
+
+### Performance
+- [ ] Tracker/indexing disabled
+- [ ] Swappiness reduced
+- [ ] Background processes minimized
