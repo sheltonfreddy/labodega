@@ -5,10 +5,12 @@ from odoo import api, fields, models
 class PosConfig(models.Model):
     _inherit = 'pos.config'
 
-    pos_type = fields.Selection([('restaurant', 'Restaurant'), ('supermarket', 'Supermarket')],
-                                required=True, default='supermarket',
-                                string="POS Type",
-                                help="Determines which product categories are shown in this POS")
+    pos_type = fields.Selection([
+        ('restaurant', 'Restaurant'),
+        ('supermarket', 'Supermarket'),
+    ], required=True, default='supermarket',
+       string="POS Type",
+       help="Determines which product categories are shown in this POS.")
     magellan_bridge_url = fields.Char(
         string="Magellan Bridge URL",
         help="URL of the Raspberry Pi bridge for this terminal (e.g., https://10.0.0.34:8000 or https://172.16.19.185:8000). "
@@ -19,27 +21,27 @@ class PosConfig(models.Model):
     def _get_available_categories(self):
         """Override to filter categories by pos_type"""
         categories = super()._get_available_categories()
-        # Filter by pos_type if set
         if self.pos_type:
             categories = categories.filtered(lambda c: c.pos_type == self.pos_type)
         return categories
 
     def _get_available_product_domain(self):
         """Override to filter products by pos_type categories"""
-        domain = super()._get_available_product_domain()
+        # Get base domain (company, active, available_in_pos, sale_ok)
+        domain = [
+            *self.env['product.product']._check_company_domain(self.company_id),
+            ('active', '=', True),
+            ('available_in_pos', '=', True),
+            ('sale_ok', '=', True),
+        ]
 
-        # Always filter products by pos_type categories
+        # Filter by pos_type categories
         if self.pos_type:
-            # Get all category IDs that match this pos_type
             matching_categories = self.env['pos.category'].search([
                 ('pos_type', '=', self.pos_type)
             ])
             if matching_categories:
-                # Products must be in at least one matching category
                 domain.append(('pos_categ_ids', 'in', matching_categories.ids))
-            else:
-                # No matching categories, return empty domain
-                domain.append(('id', '=', False))
 
         return domain
 
@@ -47,10 +49,12 @@ class PosConfig(models.Model):
 class PosCategory(models.Model):
     _inherit = 'pos.category'
 
-    pos_type = fields.Selection([('restaurant', 'Restaurant'), ('supermarket', 'Supermarket')],
-                                required=True, default='supermarket',
-                                string="POS Type",
-                                help="Determines which POS terminals will show this category")
+    pos_type = fields.Selection([
+        ('restaurant', 'Restaurant'),
+        ('supermarket', 'Supermarket')
+    ], required=True, default='supermarket',
+       string="POS Type",
+       help="Determines which POS terminals will show this category")
 
     @api.model
     def _load_pos_data_domain(self, data):
