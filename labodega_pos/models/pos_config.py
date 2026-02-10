@@ -17,6 +17,20 @@ class PosConfig(models.Model):
              "Each terminal can have its own scale/scanner. Leave empty to use the fallback default.",
         placeholder="https://10.0.0.34:8000"
     )
+    allowed_user_ids = fields.Many2many(
+        'res.users',
+        'pos_config_allowed_users_rel',
+        'config_id',
+        'user_id',
+        string="Allowed Users",
+        help="Users who are allowed to open this POS terminal. "
+             "Leave empty to allow all users with POS access."
+    )
+    restrict_user_access = fields.Boolean(
+        string="Restrict User Access",
+        default=False,
+        help="If enabled, only the selected users can see and open this POS terminal."
+    )
 
     def _get_available_categories(self):
         """Override to filter categories by pos_type"""

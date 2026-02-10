@@ -20,6 +20,28 @@
                     </div>
                 </div>
             </xpath>
+
+            <!-- Add User Access Restriction -->
+            <xpath expr="//field[@name='name']/../.." position="after">
+                <div class="o_setting_left_pane">
+                    <field name="restrict_user_access"/>
+                </div>
+                <div class="o_setting_right_pane">
+                    <label for="restrict_user_access" string="Restrict User Access"/>
+                    <div class="text-muted">
+                        Only allow specific users to open this POS terminal
+                    </div>
+                    <div class="content-group" invisible="not restrict_user_access">
+                        <div class="mt-2">
+                            <label for="allowed_user_ids" string="Allowed Users"/>
+                            <field name="allowed_user_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Select users who can access this terminal..."/>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+
             <xpath expr="//setting[@id='other_devices']" position="after">
                 <setting id="magellan_scanner" string="Magellan Scale/Scanner"
                          help="Configure Raspberry Pi bridge for Magellan scale and barcode scanner">

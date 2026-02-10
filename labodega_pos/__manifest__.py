@@ -1,10 +1,11 @@
 {
     "name": "POS Magellan Scale Integration",
-    "version": "18.0.1.0.8",  # Fixed encoding and receipt formatting
+    "version": "18.0.1.0.9",  # Added user restriction for POS terminals
     "depends": ["point_of_sale"],
     "author": "Shelton / Labodega",
     "category": "Point of Sale",
     "data": [
+        "security/pos_security.xml",
         "views/pos_config_views.xml",
     ],
     "assets": {
