@@ -54,7 +54,7 @@
     <record id="view_pos_category_form_inherit_pos_type" model="ir.ui.view">
         <field name="name">pos.category.form.inherit.pos_type</field>
         <field name="model">pos.category</field>
-        <field name="inherit_id" ref="point_of_sale.pos_category_form_view"/>
+        <field name="inherit_id" ref="point_of_sale.product_pos_category_form_view"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='parent_id']" position="after">
                 <field name="pos_type"/>
@@ -66,9 +66,9 @@
     <record id="view_pos_category_tree_inherit_pos_type" model="ir.ui.view">
         <field name="name">pos.category.tree.inherit.pos_type</field>
         <field name="model">pos.category</field>
-        <field name="inherit_id" ref="point_of_sale.pos_category_tree_view"/>
+        <field name="inherit_id" ref="point_of_sale.product_pos_category_tree_view"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='name']" position="after">
+            <xpath expr="//field[@name='display_name']" position="after">
                 <field name="pos_type"/>
             </xpath>
         </field>
