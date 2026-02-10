@@ -5,6 +5,21 @@
         <field name="model">pos.config</field>
         <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
         <field name="arch" type="xml">
+            <!-- Add POS Type field in basic settings -->
+            <xpath expr="//field[@name='name']/.." position="after">
+                <div class="o_setting_left_pane"/>
+                <div class="o_setting_right_pane">
+                    <label for="pos_type" string="POS Type"/>
+                    <div class="text-muted">
+                        Determines which product categories are shown in this POS
+                    </div>
+                    <div class="content-group">
+                        <div class="mt-2">
+                            <field name="pos_type" widget="radio" options="{'horizontal': true}"/>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
             <xpath expr="//setting[@id='other_devices']" position="after">
                 <setting id="magellan_scanner" string="Magellan Scale/Scanner"
                          help="Configure Raspberry Pi bridge for Magellan scale and barcode scanner">
@@ -31,6 +46,30 @@
                         </div>
                     </div>
                 </setting>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Add pos_type to pos.category form view -->
+    <record id="view_pos_category_form_inherit_pos_type" model="ir.ui.view">
+        <field name="name">pos.category.form.inherit.pos_type</field>
+        <field name="model">pos.category</field>
+        <field name="inherit_id" ref="point_of_sale.pos_category_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='parent_id']" position="after">
+                <field name="pos_type"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Add pos_type to pos.category list/tree view -->
+    <record id="view_pos_category_tree_inherit_pos_type" model="ir.ui.view">
+        <field name="name">pos.category.tree.inherit.pos_type</field>
+        <field name="model">pos.category</field>
+        <field name="inherit_id" ref="point_of_sale.pos_category_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="pos_type"/>
             </xpath>
         </field>
     </record>
