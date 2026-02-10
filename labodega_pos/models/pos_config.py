@@ -24,6 +24,25 @@ class PosConfig(models.Model):
             categories = categories.filtered(lambda c: c.pos_type == self.pos_type)
         return categories
 
+    def _get_available_product_domain(self):
+        """Override to filter products by pos_type categories"""
+        domain = super()._get_available_product_domain()
+
+        # Always filter products by pos_type categories
+        if self.pos_type:
+            # Get all category IDs that match this pos_type
+            matching_categories = self.env['pos.category'].search([
+                ('pos_type', '=', self.pos_type)
+            ])
+            if matching_categories:
+                # Products must be in at least one matching category
+                domain.append(('pos_categ_ids', 'in', matching_categories.ids))
+            else:
+                # No matching categories, return empty domain
+                domain.append(('id', '=', False))
+
+        return domain
+
 
 class PosCategory(models.Model):
     _inherit = 'pos.category'
