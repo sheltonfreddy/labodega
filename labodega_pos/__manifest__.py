@@ -1,6 +1,6 @@
 {
     "name": "POS Magellan Scale Integration",
-    "version": "18.0.1.0.9",  # Added user restriction for POS terminals
+    "version": "18.0.1.1.2",  # Simplified user restriction rule
     "depends": ["point_of_sale"],
     "author": "Shelton / Labodega",
     "category": "Point of Sale",
