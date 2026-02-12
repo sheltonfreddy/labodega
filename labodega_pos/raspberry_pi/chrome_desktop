@@ -1,0 +1,34 @@
+# Step 1: Create the launcher script
+sudo tee /usr/local/bin/pos-kiosk << 'EOF'
+#!/bin/bash
+google-chrome \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --disable-features=PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults \
+  --user-data-dir=$HOME/.config/chrome-pos \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --no-first-run \
+  "https://erp.labodegacalhoun.com/pos/web?config_id=2"
+EOF
+
+sudo chmod +x /usr/local/bin/pos-kiosk
+
+# Step 2: Create simple desktop file
+mkdir -p ~/Desktop
+cat > ~/Desktop/odoo-pos.desktop << 'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Odoo POS
+Comment=Launch Odoo Point of Sale
+Icon=google-chrome
+Exec=/usr/local/bin/pos-kiosk
+Terminal=false
+Categories=Application;
+
+
+
+sudo nano /usr/local/bin/pos-kiosk
+# Change config_id=2 to config_id=3 (or whatever)
