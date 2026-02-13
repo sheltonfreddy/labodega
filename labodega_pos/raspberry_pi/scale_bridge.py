@@ -142,16 +142,102 @@ def parse_s11_response(frame: bytes):
         return None
 
 
+def calculate_upc_check_digit(barcode: str) -> str:
+    """
+    Calculate UPC/EAN check digit using Modulo 10 algorithm.
+    Works for UPC-A (11 digits input) and EAN-13 (12 digits input).
+    """
+    if not barcode or not barcode.isdigit():
+        return ""
+
+    total = 0
+    for i, digit in enumerate(barcode):
+        if i % 2 == 0:
+            total += int(digit) * 3
+        else:
+            total += int(digit)
+
+    check = (10 - (total % 10)) % 10
+    return str(check)
+
+
+# Set to True to match vendor format (10 digits without leading 0)
+# Set to False to use full UPC format (12 digits with check digit)
+BARCODE_MATCH_VENDOR_FORMAT = True
+
+
+def normalize_upc_barcode(barcode: str) -> str:
+    """
+    Normalize UPC/EAN barcodes to match Odoo product barcodes.
+
+    If BARCODE_MATCH_VENDOR_FORMAT is True:
+        - '04133106438' (11 digits) → '4133106438' (10 digits, vendor format)
+        - Strips leading zero to match vendor import sheets
+
+    If BARCODE_MATCH_VENDOR_FORMAT is False:
+        - '04133106438' (11 digits) → '041331064385' (12 digits, full UPC)
+        - Adds check digit for full UPC-A format
+    """
+    if not barcode or not barcode.isdigit():
+        return barcode
+
+    length = len(barcode)
+
+    if BARCODE_MATCH_VENDOR_FORMAT:
+        # Match vendor format: strip leading zeros, no check digit
+        # This matches how vendors typically provide barcodes in import sheets
+
+        # 11 digits starting with 0 → strip to 10 digits (vendor format)
+        if length == 11 and barcode.startswith('0'):
+            normalized = barcode[1:]  # Remove leading 0
+            print(f"[BARCODE] Normalized: {barcode} → {normalized} (vendor format, stripped leading 0)")
+            return normalized
+
+        # 12 digits (full UPC) starting with 0 → strip to 10 digits
+        if length == 12 and barcode.startswith('0'):
+            normalized = barcode[1:11]  # Remove leading 0 and check digit
+            print(f"[BARCODE] Normalized: {barcode} → {normalized} (vendor format, stripped 0 and check)")
+            return normalized
+
+        # Already 10 digits or other format - return as-is
+        return barcode
+
+    else:
+        # Full UPC format: ensure 12 digits with check digit
+
+        # Already complete UPC-A (12) or EAN-13 (13)
+        if length in (12, 13):
+            return barcode
+
+        # 11 digits - missing check digit (scanner stripped it)
+        if length == 11:
+            check = calculate_upc_check_digit(barcode)
+            normalized = barcode + check
+            print(f"[BARCODE] Normalized: {barcode} → {normalized} (added check digit)")
+            return normalized
+
+        # 10 digits - missing leading 0 AND check digit
+        if length == 10:
+            with_zero = '0' + barcode
+            check = calculate_upc_check_digit(with_zero)
+            normalized = with_zero + check
+            print(f"[BARCODE] Normalized: {barcode} → {normalized} (added leading 0 + check)")
+            return normalized
+
+        # Other lengths - return as-is
+        return barcode
+
+
 def clean_magellan_barcode(barcode: str) -> str:
     """
-    Clean Magellan scanner barcode prefixes/suffixes
+    Clean Magellan scanner barcode prefixes/suffixes and normalize.
 
     Magellan scanners often prepend codes like:
     - S08A + barcode (most common)
     - S08 + barcode
     - Other symbology identifiers
 
-    This strips known prefixes and returns the actual barcode.
+    This strips known prefixes and normalizes UPC/EAN barcodes.
     """
     if not barcode:
         return barcode
@@ -169,14 +255,16 @@ def clean_magellan_barcode(barcode: str) -> str:
         'A',  # UPC-A identifier
     ]
 
+    cleaned = barcode
     for prefix in prefixes:
         if barcode.startswith(prefix):
             cleaned = barcode[len(prefix):]
             print(f"[BARCODE] Cleaned: {barcode} → {cleaned} (removed prefix: {prefix})")
-            return cleaned
+            break
 
-    # No prefix found, return as-is
-    return barcode
+    # Normalize UPC/EAN barcodes (add check digit if missing)
+    normalized = normalize_upc_barcode(cleaned)
+    return normalized
 
 
 def barcode_reader_loop():
