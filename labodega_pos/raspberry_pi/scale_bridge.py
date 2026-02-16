@@ -170,6 +170,8 @@ def normalize_upc_barcode(barcode: str) -> str:
     """
     Normalize UPC/EAN barcodes to match Odoo product barcodes.
 
+    Handles scanners that omit check digits by adding them back.
+
     If BARCODE_MATCH_VENDOR_FORMAT is True:
         - '04133106438' (11 digits) → '4133106438' (10 digits, vendor format)
         - Strips leading zero to match vendor import sheets
@@ -183,11 +185,20 @@ def normalize_upc_barcode(barcode: str) -> str:
 
     length = len(barcode)
 
+    # FIRST: Handle scanners that omit check digit (send 11 digits instead of 12)
+    # Add the check digit to make it a complete 12-digit UPC
+    if length == 11:
+        check = calculate_upc_check_digit(barcode)
+        barcode = barcode + check
+        length = 12
+        print(f"[BARCODE] Added missing check digit: {barcode[:-1]} → {barcode}")
+
     if BARCODE_MATCH_VENDOR_FORMAT:
         # Match vendor format: strip leading zeros, no check digit
         # This matches how vendors typically provide barcodes in import sheets
 
         # 11 digits starting with 0 → strip to 10 digits (vendor format)
+        # (This case is now rare since we add check digit above)
         if length == 11 and barcode.startswith('0'):
             normalized = barcode[1:]  # Remove leading 0
             print(f"[BARCODE] Normalized: {barcode} → {normalized} (vendor format, stripped leading 0)")
@@ -199,7 +210,7 @@ def normalize_upc_barcode(barcode: str) -> str:
             print(f"[BARCODE] Normalized: {barcode} → {normalized} (vendor format, stripped 0 and check)")
             return normalized
 
-        # Already 10 digits or other format - return as-is
+        # Already 10, 12, or 13 digits - return as-is (common case)
         return barcode
 
     else:
