@@ -211,7 +211,7 @@ class ProductImportWizard(models.TransientModel):
                     vals = {
                         'name': name,
                         'barcode': barcode,
-                        'detailed_type': 'consu',
+                        'type': 'consu',
                         'available_in_pos': available_in_pos,
                         'description_purchase': f"Vendor: {self.vendor_name}",
                     }
