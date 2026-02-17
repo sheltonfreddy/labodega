@@ -14,11 +14,13 @@
                     <group string="Vendor Information">
                         <field name="vendor_name"/>
                     </group>
-                    <group string="Update Options">
+                    <group string="Update Options" col="2">
                         <field name="update_name"/>
                         <field name="update_cost"/>
                         <field name="update_sale_price"/>
                         <field name="update_purchase_desc"/>
+                        <field name="update_category"/>
+                        <field name="update_pos_category"/>
                         <field name="create_new_products"/>
                     </group>
                 </group>
@@ -60,4 +62,5 @@
               sequence="100"/>
 
 </odoo>
+
 
