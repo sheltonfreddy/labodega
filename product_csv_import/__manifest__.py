@@ -15,11 +15,13 @@
     'author': 'La Bodega',
     'depends': ['product', 'stock', 'point_of_sale'],
     'data': [
+        'security/ir.model.access.csv',
         'views/import_wizard_views.xml',
     ],
     'installable': True,
     'application': False,
     'license': 'LGPL-3',
 }
+
 
 
