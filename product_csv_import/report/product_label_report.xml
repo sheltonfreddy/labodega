@@ -8,7 +8,7 @@
     <record id="paperformat_product_labels" model="report.paperformat">
         <field name="name">Product Labels (5x3cm, 32 per sheet)</field>
         <field name="default" eval="False"/>
-        <field name="format">Letter</field>
+        <field name="format">custom</field>
         <field name="page_height">279</field>
         <field name="page_width">216</field>
         <field name="orientation">Portrait</field>
