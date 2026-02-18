@@ -71,7 +71,7 @@
                                         width: 50mm;
                                         height: 10mm;
                                         padding: 1mm 2mm;
-                                        text-align: center;
+                                        text-align: left;
                                         overflow: hidden;
                                     ">
                                         <span style="
@@ -105,11 +105,11 @@
                                             </t>
                                         </div>
 
-                                        <!-- Price - moved up and 10mm left -->
+                                        <!-- Price - moved up 5mm more and slightly right -->
                                         <div style="
                                             position: absolute;
-                                            bottom: 5mm;
-                                            right: 12mm;
+                                            bottom: 10mm;
+                                            right: 8mm;
                                             text-align: right;
                                         ">
                                             <span style="font-size: 16pt; font-weight: 900;">
