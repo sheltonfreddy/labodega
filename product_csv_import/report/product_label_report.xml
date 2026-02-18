@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Product Label Report Paperformat -->
+    <!-- Sheet: Letter size (8.5" x 11" = 215.9mm x 279.4mm) -->
+    <!-- Labels: 5cm x 3cm, 4 columns x 8 rows = 32 labels -->
+    <!-- Top margin: 1mm, Bottom: 2cm, Left: 0.5cm, Right: 0.5cm -->
+    <!-- Horizontal gap: 4mm, Vertical gap: 2mm -->
+    <record id="paperformat_product_labels" model="report.paperformat">
+        <field name="name">Product Labels (5x3cm, 32 per sheet)</field>
+        <field name="default" eval="False"/>
+        <field name="format">Letter</field>
+        <field name="page_height">279</field>
+        <field name="page_width">216</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">1</field>
+        <field name="margin_bottom">20</field>
+        <field name="margin_left">5</field>
+        <field name="margin_right">5</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">96</field>
+    </record>
+
+    <!-- Product Label Report Action -->
+    <record id="action_report_product_labels" model="ir.actions.report">
+        <field name="name">Product Labels</field>
+        <field name="model">product.product</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">product_csv_import.report_product_labels</field>
+        <field name="report_file">product_csv_import.report_product_labels</field>
+        <field name="print_report_name">'Product_Labels'</field>
+        <field name="paperformat_id" ref="paperformat_product_labels"/>
+        <field name="binding_model_id" ref="product.model_product_product"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- QWeb Report Template - Main entry point -->
+    <template id="report_product_labels">
+        <t t-call="web.html_container">
+            <div class="article">
+                <style>
+                    @page {
+                        size: Letter portrait;
+                        margin-top: 1mm;
+                        margin-bottom: 20mm;
+                        margin-left: 5mm;
+                        margin-right: 5mm;
+                    }
+                    body {
+                        margin: 0;
+                        padding: 0;
+                    }
+                    /* Label sheet layout */
+                    .label-sheet {
+                        width: 206mm; /* Page width minus margins */
+                        font-family: Arial, sans-serif;
+                    }
+                    .label-row {
+                        display: table;
+                        width: 100%;
+                        margin-bottom: 2mm; /* Vertical gap between labels */
+                        page-break-inside: avoid;
+                    }
+                    .label-cell {
+                        display: table-cell;
+                        width: 50mm;  /* Label width */
+                        height: 30mm; /* Label height */
+                        max-width: 50mm;
+                        box-sizing: border-box;
+                        padding: 2mm;
+                        border: 0.3pt dashed #aaa; /* Dashed border for cutting guide */
+                        overflow: hidden;
+                        vertical-align: top;
+                    }
+                    .label-spacer {
+                        display: table-cell;
+                        width: 4mm; /* Horizontal gap between labels */
+                    }
+                    .label-inner {
+                        height: 26mm;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: space-between;
+                    }
+                    .product-name {
+                        font-size: 7pt;
+                        font-weight: bold;
+                        text-align: center;
+                        line-height: 1.1;
+                        max-height: 9mm;
+                        overflow: hidden;
+                        word-wrap: break-word;
+                    }
+                    .barcode-container {
+                        text-align: center;
+                        padding: 1mm 0;
+                    }
+                    .barcode-container img {
+                        max-width: 44mm;
+                        height: 10mm;
+                    }
+                    .barcode-text {
+                        font-size: 5pt;
+                        text-align: center;
+                        margin-top: 0.5mm;
+                        font-family: monospace;
+                    }
+                    .price {
+                        font-size: 11pt;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    .price-currency {
+                        font-size: 8pt;
+                    }
+                    .no-barcode {
+                        font-size: 6pt;
+                        color: #999;
+                        text-align: center;
+                    }
+                </style>
+
+                <div class="label-sheet">
+                    <!-- Process products in groups of 4 (one row) -->
+                    <t t-set="products_list" t-value="list(docs)"/>
+                    <t t-set="total_products" t-value="len(products_list)"/>
+                    <t t-set="row_index" t-value="0"/>
+
+                    <t t-foreach="range(0, total_products, 4)" t-as="start_idx">
+                        <!-- Page break after every 32 labels (8 rows) -->
+                        <t t-if="start_idx > 0 and start_idx % 32 == 0">
+                            <div style="page-break-before: always;"/>
+                        </t>
+
+                        <div class="label-row">
+                            <!-- Label 1 -->
+                            <t t-if="start_idx &lt; total_products">
+                                <t t-set="product" t-value="products_list[start_idx]"/>
+                                <div class="label-cell">
+                                    <div class="label-inner">
+                                        <div class="product-name"><t t-esc="product.name"/></div>
+                                        <div class="barcode-container">
+                                            <t t-if="product.barcode">
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="no-barcode">No Barcode</div>
+                                            </t>
+                                        </div>
+                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <!-- Spacer 1 -->
+                            <t t-if="start_idx + 1 &lt; total_products">
+                                <div class="label-spacer"/>
+                            </t>
+
+                            <!-- Label 2 -->
+                            <t t-if="start_idx + 1 &lt; total_products">
+                                <t t-set="product" t-value="products_list[start_idx + 1]"/>
+                                <div class="label-cell">
+                                    <div class="label-inner">
+                                        <div class="product-name"><t t-esc="product.name"/></div>
+                                        <div class="barcode-container">
+                                            <t t-if="product.barcode">
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="no-barcode">No Barcode</div>
+                                            </t>
+                                        </div>
+                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <!-- Spacer 2 -->
+                            <t t-if="start_idx + 2 &lt; total_products">
+                                <div class="label-spacer"/>
+                            </t>
+
+                            <!-- Label 3 -->
+                            <t t-if="start_idx + 2 &lt; total_products">
+                                <t t-set="product" t-value="products_list[start_idx + 2]"/>
+                                <div class="label-cell">
+                                    <div class="label-inner">
+                                        <div class="product-name"><t t-esc="product.name"/></div>
+                                        <div class="barcode-container">
+                                            <t t-if="product.barcode">
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="no-barcode">No Barcode</div>
+                                            </t>
+                                        </div>
+                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <!-- Spacer 3 -->
+                            <t t-if="start_idx + 3 &lt; total_products">
+                                <div class="label-spacer"/>
+                            </t>
+
+                            <!-- Label 4 -->
+                            <t t-if="start_idx + 3 &lt; total_products">
+                                <t t-set="product" t-value="products_list[start_idx + 3]"/>
+                                <div class="label-cell">
+                                    <div class="label-inner">
+                                        <div class="product-name"><t t-esc="product.name"/></div>
+                                        <div class="barcode-container">
+                                            <t t-if="product.barcode">
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="no-barcode">No Barcode</div>
+                                            </t>
+                                        </div>
+                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>
+
+

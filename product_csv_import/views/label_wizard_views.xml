@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Product Label Wizard Form View -->
+    <record id="view_product_label_wizard_form" model="ir.ui.view">
+        <field name="name">product.label.wizard.form</field>
+        <field name="model">product.label.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Print Product Labels">
+                <group>
+                    <field name="product_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                    <field name="copies"/>
+                </group>
+                <div class="alert alert-info" role="alert">
+                    <strong>Label Format:</strong> 5cm × 3cm labels, 4 columns × 8 rows = 32 labels per sheet<br/>
+                    Each label includes: Product Name, Barcode, and Sale Price
+                </div>
+                <footer>
+                    <button name="action_print_labels" string="Print Labels" type="object" class="btn-primary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action to open the wizard -->
+    <record id="action_product_label_wizard" model="ir.actions.act_window">
+        <field name="name">Print Product Labels</field>
+        <field name="res_model">product.label.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="product.model_product_product"/>
+        <field name="binding_view_types">list,form</field>
+    </record>
+
+    <!-- Menu Item under Inventory Products for quick access -->
+    <menuitem id="menu_product_label_wizard"
+              name="Print Product Labels"
+              parent="stock.menu_stock_inventory_control"
+              action="action_product_label_wizard"
+              sequence="110"/>
+</odoo>
+
