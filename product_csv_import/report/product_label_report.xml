@@ -87,6 +87,7 @@
                         overflow: hidden;
                         border: 0.5pt dashed #ccc;
                         margin-right: 2mm;
+                        margin-top: 4mm;
                     }
                     .label-box:last-child {
                         margin-right: 0;
