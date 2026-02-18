@@ -3,7 +3,8 @@
     <!-- Product Label Report Paperformat -->
     <!-- Sheet: Letter size (215.9mm x 279.4mm) -->
     <!-- Labels: 50mm x 30mm, 4 columns x 8 rows = 32 labels per sheet -->
-    <!-- Layout: 5mm | 50mm | 2mm | 50mm | 2mm | 50mm | 2mm | 50mm | 5mm = 216mm -->
+    <!-- Physical layout: 5mm left | 50mm | 2mm | 50mm | 2mm | 50mm | 2mm | 50mm | 5mm right -->
+    <!-- Vertical: 15mm top margin, 30mm label + 2mm gap per row -->
     <record id="paperformat_product_labels" model="report.paperformat">
         <field name="name">Product Labels (5x3cm, 32 per sheet)</field>
         <field name="default" eval="False"/>
@@ -11,9 +12,9 @@
         <field name="page_height">279</field>
         <field name="page_width">216</field>
         <field name="orientation">Portrait</field>
-        <field name="margin_top">11</field>
-        <field name="margin_bottom">20</field>
-        <field name="margin_left">1</field>
+        <field name="margin_top">15</field>
+        <field name="margin_bottom">8</field>
+        <field name="margin_left">5</field>
         <field name="margin_right">5</field>
         <field name="header_line" eval="False"/>
         <field name="header_spacing">0</field>
@@ -37,11 +38,11 @@
     <!-- QWeb Report Template -->
     <template id="report_product_labels">
         <t t-call="web.html_container">
-            <div class="article">
+            <div class="article" style="width:206mm;">
                 <style>
                     @page {
                         size: 216mm 279mm;
-                        margin: 11mm 5mm 20mm 0mm;
+                        margin: 15mm 5mm 8mm 5mm;
                     }
                     * {
                         margin: 0;
@@ -50,55 +51,38 @@
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
-                    html {
-                        /* Zoom factor to compensate for wkhtmltopdf rendering - adjust if needed */
-                        zoom: 1.0;
-                    }
                     body {
                         margin: 0;
                         padding: 0;
                         font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
-                        width: 206mm;
                     }
                     .page-container {
                         width: 206mm;
-                        position: relative;
                     }
+                    /* Each row = 30mm label + 2mm gap = 32mm total */
                     .label-row {
                         width: 206mm;
-                        height: 27mm;
-                        margin-bottom: 0mm;
+                        height: 32mm;
                         position: relative;
                         page-break-inside: avoid;
                         clear: both;
                     }
-                    .label-row:nth-child(8n) {
-                        margin-bottom: 0;
-                    }
-                    /* Position each label using float instead of absolute */
                     .label-box {
                         float: left;
-                        width: 50mm !important;
-                        min-width: 50mm !important;
-                        max-width: 50mm !important;
-                        height: 27mm !important;
-                        min-height: 27mm !important;
-                        max-height: 27mm !important;
+                        width: 50mm;
+                        height: 30mm;
                         overflow: hidden;
                         border: 0.5pt dashed #ccc;
                         margin-right: 2mm;
-                    }
-                    .label-box:last-child {
-                        margin-right: 0;
+                        margin-bottom: 2mm;
                     }
                     .label-box.no-margin {
                         margin-right: 0;
                     }
-
-                    /* Top section - 9mm for product name */
+                    /* Top section - 10mm for product name */
                     .label-top {
-                        width: 50mm !important;
-                        height: 9mm !important;
+                        width: 50mm;
+                        height: 10mm;
                         padding: 1mm 2mm;
                         overflow: hidden;
                     }
@@ -109,14 +93,14 @@
                         line-height: 1.1;
                         text-transform: uppercase;
                         color: #000;
-                        max-height: 7mm;
+                        max-height: 8mm;
                         overflow: hidden;
                         word-wrap: break-word;
                     }
-                    /* Bottom section - 18mm for barcode and price */
+                    /* Bottom section - 20mm for barcode and price */
                     .label-bottom {
-                        width: 50mm !important;
-                        height: 18mm !important;
+                        width: 50mm;
+                        height: 20mm;
                         padding: 1mm;
                         position: relative;
                         overflow: hidden;
