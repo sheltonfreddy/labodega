@@ -4,7 +4,8 @@
     <!-- Sheet: Letter size (215.9mm x 279.4mm) -->
     <!-- Labels: 50mm x 30mm, 4 columns x 8 rows = 32 labels per sheet -->
     <!-- Layout: 5mm | 50mm | 2mm | 50mm | 2mm | 50mm | 2mm | 50mm | 5mm = 216mm -->
-    <!-- Vertical: 15mm top | (30mm + 2mm) x 8 rows | 20mm bottom -->
+    <!-- At 96 DPI: 1mm = 3.78px -->
+    <!-- 50mm = 189px, 30mm = 113px, 2mm = 8px, 5mm = 19px -->
     <record id="paperformat_product_labels" model="report.paperformat">
         <field name="name">Product Labels (5x3cm, 32 per sheet)</field>
         <field name="default" eval="False"/>
@@ -39,9 +40,11 @@
         <t t-call="web.html_container">
             <div class="article">
                 <style>
+                    /* At 96 DPI: 1mm = 3.78px */
+                    /* 50mm = 189px, 30mm = 113px, 2mm = 8px, 5mm = 19px, 10mm = 38px, 20mm = 76px */
                     @page {
-                        size: 216mm 279mm;
-                        margin: 15mm 5mm 20mm 5mm;
+                        size: 816px 1054px; /* 216mm x 279mm */
+                        margin: 57px 19px 76px 19px; /* 15mm 5mm 20mm 5mm */
                     }
                     * {
                         margin: 0;
@@ -54,25 +57,25 @@
                         font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
                     }
                     .label-table {
-                        width: 206mm;
+                        width: 780px; /* 206mm = 778px, round to 780 */
                         border-collapse: collapse;
                         table-layout: fixed;
                         border-spacing: 0;
                     }
                     .label-table col.label-col {
-                        width: 50mm;
+                        width: 189px; /* 50mm */
                     }
                     .label-table col.gap-col {
-                        width: 2mm;
+                        width: 8px; /* 2mm */
                     }
                     .label-table tr {
-                        height: 30mm;
+                        height: 113px; /* 30mm */
                     }
                     .label-table tr.gap-row {
-                        height: 2mm;
+                        height: 8px; /* 2mm */
                     }
                     .label-table tr.gap-row td {
-                        height: 2mm;
+                        height: 8px;
                         padding: 0;
                         border: none;
                     }
@@ -82,20 +85,20 @@
                         overflow: visible;
                     }
                     .label-table td.gap-cell {
-                        width: 2mm;
+                        width: 8px; /* 2mm */
                         padding: 0;
                     }
                     .label-box {
-                        width: 50mm;
-                        height: 30mm;
+                        width: 189px; /* 50mm */
+                        height: 113px; /* 30mm */
                         overflow: hidden;
-                        border: 0.2pt dashed #ccc;
+                        border: 1px dashed #ccc;
                     }
-                    /* Top section - 10mm for product name */
+                    /* Top section - 10mm = 38px for product name */
                     .label-top {
-                        width: 50mm;
-                        height: 10mm;
-                        padding: 1mm 2mm;
+                        width: 189px;
+                        height: 38px;
+                        padding: 4px 8px;
                         overflow: hidden;
                     }
                     .product-name {
@@ -105,26 +108,26 @@
                         line-height: 1.1;
                         text-transform: uppercase;
                         color: #000;
-                        max-height: 8mm;
+                        max-height: 30px;
                         overflow: hidden;
                         word-wrap: break-word;
                     }
-                    /* Bottom section - 20mm for barcode and price */
+                    /* Bottom section - 20mm = 76px for barcode and price */
                     .label-bottom {
-                        width: 50mm;
-                        height: 20mm;
-                        padding: 1mm;
+                        width: 189px;
+                        height: 75px;
+                        padding: 4px;
                         position: relative;
                     }
                     .barcode-area {
-                        width: 32mm;
+                        width: 120px;
                         display: inline-block;
                         text-align: center;
                         vertical-align: top;
                     }
                     .barcode-area img {
-                        width: 30mm;
-                        height: 10mm;
+                        width: 113px; /* 30mm */
+                        height: 38px; /* 10mm */
                     }
                     .barcode-text {
                         font-size: 6pt;
@@ -132,12 +135,12 @@
                         text-align: center;
                         font-family: 'Courier New', monospace;
                         color: #000;
-                        margin-top: 0.5mm;
+                        margin-top: 2px;
                     }
                     .price-area {
                         position: absolute;
-                        bottom: 1mm;
-                        right: 1mm;
+                        bottom: 4px;
+                        right: 4px;
                         text-align: right;
                     }
                     .price {
@@ -154,14 +157,14 @@
                         font-size: 12pt;
                         vertical-align: top;
                         position: relative;
-                        top: -4pt;
+                        top: -4px;
                     }
                     .no-barcode {
                         font-size: 7pt;
                         color: #333;
                         text-align: center;
                         font-style: italic;
-                        padding-top: 4mm;
+                        padding-top: 15px;
                     }
                     .page-break {
                         page-break-before: always;
