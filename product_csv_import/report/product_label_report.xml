@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Product Label Report Paperformat -->
-    <!-- Sheet: Letter size (215.9mm x 279.4mm) -->
-    <!-- Labels: 50mm x 30mm, 4 columns x 8 rows = 32 labels per sheet -->
-    <!-- Physical layout: 5mm left | 50mm | 2mm | 50mm | 2mm | 50mm | 2mm | 50mm | 5mm right -->
-    <!-- Adjusted for wkhtmltopdf rendering differences -->
+    <!-- Using ZERO margins - all positioning handled in CSS -->
     <record id="paperformat_product_labels" model="report.paperformat">
         <field name="name">Product Labels (5x3cm, 32 per sheet)</field>
         <field name="default" eval="False"/>
@@ -12,10 +9,10 @@
         <field name="page_height">279</field>
         <field name="page_width">216</field>
         <field name="orientation">Portrait</field>
-        <field name="margin_top">11</field>
-        <field name="margin_bottom">8</field>
-        <field name="margin_left">1</field>
-        <field name="margin_right">5</field>
+        <field name="margin_top">0</field>
+        <field name="margin_bottom">0</field>
+        <field name="margin_left">0</field>
+        <field name="margin_right">0</field>
         <field name="header_line" eval="False"/>
         <field name="header_spacing">0</field>
         <field name="dpi">96</field>
@@ -35,239 +32,97 @@
         <field name="binding_type">report</field>
     </record>
 
-    <!-- QWeb Report Template -->
+    <!-- QWeb Report Template - Using absolute positioning -->
     <template id="report_product_labels">
         <t t-call="web.html_container">
-            <div class="article" style="width:206mm;">
-                <style>
-                    @page {
-                        size: 216mm 279mm;
-                        margin: 11mm 5mm 8mm 1mm;
-                    }
-                    * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    body {
-                        margin: 0;
-                        padding: 0;
-                        font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
-                    }
-                    .page-container {
-                        width: 206mm;
-                    }
-                    /* Each row = 30mm label + 2mm gap = 32mm total */
-                    /* wkhtmltopdf renders ~1.125x larger, so 32mm / 1.125 = ~28.5mm CSS value needed */
-                    .label-row {
-                        width: 206mm;
-                        height: 28.5mm;
-                        position: relative;
-                        page-break-inside: avoid;
-                        clear: both;
-                    }
-                    .label-box {
-                        float: left;
-                        width: 50mm;
-                        height: 26.5mm;
-                        overflow: hidden;
-                        border: 0.5pt dashed #ccc;
-                        margin-right: 2mm;
-                        margin-bottom: 2mm;
-                    }
-                    .label-box.no-margin {
-                        margin-right: 0;
-                    }
-                    /* Top section for product name */
-                    .label-top {
-                        width: 50mm;
-                        height: 9mm;
-                        padding: 1mm 2mm;
-                        overflow: hidden;
-                    }
-                    .product-name {
-                        font-size: 7pt;
-                        font-weight: 900;
-                        text-align: center;
-                        line-height: 1.1;
-                        text-transform: uppercase;
-                        color: #000;
-                        max-height: 7mm;
-                        overflow: hidden;
-                        word-wrap: break-word;
-                    }
-                    /* Bottom section for barcode and price */
-                    .label-bottom {
-                        width: 50mm;
-                        height: 17.5mm;
-                        padding: 1mm;
-                        position: relative;
-                        overflow: hidden;
-                    }
-                    .barcode-area {
-                        width: 32mm;
-                        display: inline-block;
-                        text-align: center;
-                        vertical-align: top;
-                    }
-                    .barcode-area img {
-                        width: 30mm;
-                        height: 9mm;
-                    }
-                    .barcode-text {
-                        font-size: 6pt;
-                        font-weight: bold;
-                        text-align: center;
-                        font-family: 'Courier New', monospace;
-                        color: #000;
-                        margin-top: 0.5mm;
-                    }
-                    .price-area {
-                        position: absolute;
-                        bottom: 1mm;
-                        right: 2mm;
-                        text-align: right;
-                    }
-                    .price {
-                        font-size: 16pt;
-                        font-weight: 900;
-                        color: #000;
-                        line-height: 1;
-                        white-space: nowrap;
-                    }
-                    .price-currency {
-                        font-size: 10pt;
-                    }
-                    .price-cents {
-                        font-size: 10pt;
-                        vertical-align: top;
-                        position: relative;
-                        top: -2pt;
-                    }
-                    .no-barcode {
-                        font-size: 7pt;
-                        color: #333;
-                        text-align: center;
-                        font-style: italic;
-                        padding-top: 4mm;
-                    }
-                    .page-break {
-                        page-break-before: always;
-                    }
-                </style>
+            <t t-set="products_list" t-value="list(docs)"/>
+            <t t-set="total_products" t-value="len(products_list)"/>
 
-                <t t-set="products_list" t-value="list(docs)"/>
-                <t t-set="total_products" t-value="len(products_list)"/>
+            <t t-foreach="range(0, total_products, 32)" t-as="page_start">
+                <div class="page" style="
+                    width: 216mm;
+                    height: 279mm;
+                    position: relative;
+                    page-break-after: always;
+                    font-family: Arial, Helvetica, sans-serif;
+                ">
+                    <t t-foreach="range(8)" t-as="row">
+                        <t t-foreach="range(4)" t-as="col">
+                            <t t-set="idx" t-value="page_start + row * 4 + col"/>
+                            <t t-if="idx &lt; total_products">
+                                <t t-set="product" t-value="products_list[idx]"/>
+                                <!--
+                                    Position calculation:
+                                    Left: 5mm + col * 52mm (50mm label + 2mm gap)
+                                    Top: 15mm + row * 32mm (30mm label + 2mm gap)
+                                -->
+                                <div t-attf-style="
+                                    position: absolute;
+                                    left: {{ 5 + col * 52 }}mm;
+                                    top: {{ 15 + row * 32 }}mm;
+                                    width: 50mm;
+                                    height: 30mm;
+                                    overflow: hidden;
+                                    border: 0.5pt dashed #ccc;
+                                    box-sizing: border-box;
+                                ">
+                                    <!-- Product Name - Top 10mm -->
+                                    <div style="
+                                        width: 50mm;
+                                        height: 10mm;
+                                        padding: 1mm 2mm;
+                                        text-align: center;
+                                        overflow: hidden;
+                                    ">
+                                        <span style="
+                                            font-size: 7pt;
+                                            font-weight: 900;
+                                            text-transform: uppercase;
+                                            line-height: 1.1;
+                                        "><t t-esc="product.name"/></span>
+                                    </div>
 
-                <div class="page-container">
-                    <t t-foreach="range(0, total_products, 4)" t-as="start_idx">
-                        <!-- Page break after every 32 labels (8 rows) -->
-                        <t t-if="start_idx > 0 and start_idx % 32 == 0">
-                            <div class="page-break"/>
+                                    <!-- Barcode and Price - Bottom 20mm -->
+                                    <div style="
+                                        width: 50mm;
+                                        height: 20mm;
+                                        padding: 1mm;
+                                        position: relative;
+                                    ">
+                                        <!-- Barcode -->
+                                        <div style="
+                                            display: inline-block;
+                                            width: 32mm;
+                                            text-align: center;
+                                            vertical-align: top;
+                                        ">
+                                            <t t-if="product.barcode">
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=250&amp;height=60&amp;humanreadable=0" style="width: 30mm; height: 9mm;"/>
+                                                <div style="font-size: 6pt; font-family: monospace; margin-top: 0.5mm;"><t t-esc="product.barcode"/></div>
+                                            </t>
+                                            <t t-else="">
+                                                <div style="font-size: 7pt; color: #333; font-style: italic; padding-top: 4mm;">NO BARCODE</div>
+                                            </t>
+                                        </div>
+
+                                        <!-- Price -->
+                                        <div style="
+                                            position: absolute;
+                                            bottom: 1mm;
+                                            right: 2mm;
+                                            text-align: right;
+                                        ">
+                                            <span style="font-size: 16pt; font-weight: 900;">
+                                                <span style="font-size: 10pt;">$</span><t t-esc="int(product.list_price)"/><span style="font-size: 10pt; vertical-align: top; position: relative; top: -2pt;"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </t>
                         </t>
-
-                        <div class="label-row">
-                            <!-- Label 1 -->
-                            <t t-if="start_idx &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx]"/>
-                                <div class="label-box">
-                                    <div class="label-top">
-                                        <div class="product-name"><t t-esc="product.name"/></div>
-                                    </div>
-                                    <div class="label-bottom">
-                                        <div class="barcode-area">
-                                            <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=250&amp;height=60&amp;humanreadable=0"/>
-                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
-                                            </t>
-                                            <t t-else="">
-                                                <div class="no-barcode">NO BARCODE</div>
-                                            </t>
-                                        </div>
-                                        <div class="price-area">
-                                            <div class="price"><span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </t>
-
-                            <!-- Label 2 -->
-                            <t t-if="start_idx + 1 &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx + 1]"/>
-                                <div class="label-box">
-                                    <div class="label-top">
-                                        <div class="product-name"><t t-esc="product.name"/></div>
-                                    </div>
-                                    <div class="label-bottom">
-                                        <div class="barcode-area">
-                                            <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=250&amp;height=60&amp;humanreadable=0"/>
-                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
-                                            </t>
-                                            <t t-else="">
-                                                <div class="no-barcode">NO BARCODE</div>
-                                            </t>
-                                        </div>
-                                        <div class="price-area">
-                                            <div class="price"><span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </t>
-
-                            <!-- Label 3 -->
-                            <t t-if="start_idx + 2 &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx + 2]"/>
-                                <div class="label-box">
-                                    <div class="label-top">
-                                        <div class="product-name"><t t-esc="product.name"/></div>
-                                    </div>
-                                    <div class="label-bottom">
-                                        <div class="barcode-area">
-                                            <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=250&amp;height=60&amp;humanreadable=0"/>
-                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
-                                            </t>
-                                            <t t-else="">
-                                                <div class="no-barcode">NO BARCODE</div>
-                                            </t>
-                                        </div>
-                                        <div class="price-area">
-                                            <div class="price"><span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </t>
-
-                            <!-- Label 4 -->
-                            <t t-if="start_idx + 3 &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx + 3]"/>
-                                <div class="label-box no-margin">
-                                    <div class="label-top">
-                                        <div class="product-name"><t t-esc="product.name"/></div>
-                                    </div>
-                                    <div class="label-bottom">
-                                        <div class="barcode-area">
-                                            <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=250&amp;height=60&amp;humanreadable=0"/>
-                                                <div class="barcode-text"><t t-esc="product.barcode"/></div>
-                                            </t>
-                                            <t t-else="">
-                                                <div class="no-barcode">NO BARCODE</div>
-                                            </t>
-                                        </div>
-                                        <div class="price-area">
-                                            <div class="price"><span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </t>
-                        </div>
                     </t>
                 </div>
-            </div>
+            </t>
         </t>
     </template>
 </odoo>
