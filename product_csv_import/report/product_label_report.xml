@@ -12,7 +12,7 @@
         <field name="page_height">279</field>
         <field name="page_width">216</field>
         <field name="orientation">Portrait</field>
-        <field name="margin_top">1</field>
+        <field name="margin_top">15</field>
         <field name="margin_bottom">20</field>
         <field name="margin_left">5</field>
         <field name="margin_right">5</field>
@@ -41,7 +41,7 @@
                 <style>
                     @page {
                         size: Letter portrait;
-                        margin-top: 1mm;
+                        margin-top: 15mm;
                         margin-bottom: 20mm;
                         margin-left: 5mm;
                         margin-right: 5mm;
@@ -53,7 +53,7 @@
                     /* Label sheet layout */
                     .label-sheet {
                         width: 206mm; /* Page width minus margins */
-                        font-family: Arial, sans-serif;
+                        font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
                     }
                     .label-row {
                         display: table;
@@ -67,56 +67,74 @@
                         height: 30mm; /* Label height */
                         max-width: 50mm;
                         box-sizing: border-box;
-                        padding: 2mm;
+                        padding: 1.5mm;
                         border: 0.3pt dashed #aaa; /* Dashed border for cutting guide */
                         overflow: hidden;
                         vertical-align: top;
+                        background: #fff;
                     }
                     .label-spacer {
                         display: table-cell;
                         width: 4mm; /* Horizontal gap between labels */
                     }
                     .label-inner {
-                        height: 26mm;
+                        height: 27mm;
                         display: flex;
                         flex-direction: column;
                         justify-content: space-between;
+                        align-items: center;
                     }
                     .product-name {
-                        font-size: 7pt;
-                        font-weight: bold;
+                        font-size: 9pt;
+                        font-weight: 900;
                         text-align: center;
-                        line-height: 1.1;
-                        max-height: 9mm;
+                        line-height: 1.15;
+                        max-height: 11mm;
                         overflow: hidden;
                         word-wrap: break-word;
+                        text-transform: uppercase;
+                        color: #000;
+                        width: 100%;
                     }
                     .barcode-container {
                         text-align: center;
-                        padding: 1mm 0;
+                        padding: 0.5mm 0;
+                        width: 100%;
                     }
                     .barcode-container img {
-                        max-width: 44mm;
-                        height: 10mm;
+                        max-width: 46mm;
+                        height: 8mm;
                     }
                     .barcode-text {
-                        font-size: 5pt;
-                        text-align: center;
-                        margin-top: 0.5mm;
-                        font-family: monospace;
-                    }
-                    .price {
-                        font-size: 11pt;
+                        font-size: 6pt;
                         font-weight: bold;
                         text-align: center;
+                        margin-top: 0.3mm;
+                        font-family: 'Courier New', monospace;
+                        letter-spacing: 0.5pt;
+                        color: #000;
+                    }
+                    .price {
+                        font-size: 16pt;
+                        font-weight: 900;
+                        text-align: center;
+                        color: #000;
+                        letter-spacing: -0.5pt;
                     }
                     .price-currency {
-                        font-size: 8pt;
+                        font-size: 10pt;
+                        vertical-align: super;
+                        margin-right: 1pt;
+                    }
+                    .price-cents {
+                        font-size: 10pt;
+                        vertical-align: super;
                     }
                     .no-barcode {
-                        font-size: 6pt;
-                        color: #999;
+                        font-size: 7pt;
+                        color: #666;
                         text-align: center;
+                        font-style: italic;
                     }
                 </style>
 
@@ -141,14 +159,16 @@
                                         <div class="product-name"><t t-esc="product.name"/></div>
                                         <div class="barcode-container">
                                             <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=35&amp;humanreadable=0"/>
                                                 <div class="barcode-text"><t t-esc="product.barcode"/></div>
                                             </t>
                                             <t t-else="">
-                                                <div class="no-barcode">No Barcode</div>
+                                                <div class="no-barcode">NO BARCODE</div>
                                             </t>
                                         </div>
-                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                        <div class="price">
+                                            <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int((product.list_price % 1) * 100)"/></span>
+                                        </div>
                                     </div>
                                 </div>
                             </t>
@@ -166,14 +186,16 @@
                                         <div class="product-name"><t t-esc="product.name"/></div>
                                         <div class="barcode-container">
                                             <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=35&amp;humanreadable=0"/>
                                                 <div class="barcode-text"><t t-esc="product.barcode"/></div>
                                             </t>
                                             <t t-else="">
-                                                <div class="no-barcode">No Barcode</div>
+                                                <div class="no-barcode">NO BARCODE</div>
                                             </t>
                                         </div>
-                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                        <div class="price">
+                                            <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int((product.list_price % 1) * 100)"/></span>
+                                        </div>
                                     </div>
                                 </div>
                             </t>
@@ -191,14 +213,16 @@
                                         <div class="product-name"><t t-esc="product.name"/></div>
                                         <div class="barcode-container">
                                             <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=35&amp;humanreadable=0"/>
                                                 <div class="barcode-text"><t t-esc="product.barcode"/></div>
                                             </t>
                                             <t t-else="">
-                                                <div class="no-barcode">No Barcode</div>
+                                                <div class="no-barcode">NO BARCODE</div>
                                             </t>
                                         </div>
-                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                        <div class="price">
+                                            <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int((product.list_price % 1) * 100)"/></span>
+                                        </div>
                                     </div>
                                 </div>
                             </t>
@@ -216,14 +240,16 @@
                                         <div class="product-name"><t t-esc="product.name"/></div>
                                         <div class="barcode-container">
                                             <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=40&amp;humanreadable=0"/>
+                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=200&amp;height=35&amp;humanreadable=0"/>
                                                 <div class="barcode-text"><t t-esc="product.barcode"/></div>
                                             </t>
                                             <t t-else="">
-                                                <div class="no-barcode">No Barcode</div>
+                                                <div class="no-barcode">NO BARCODE</div>
                                             </t>
                                         </div>
-                                        <div class="price"><span class="price-currency">$</span><t t-esc="'%.2f' % product.list_price"/></div>
+                                        <div class="price">
+                                            <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int((product.list_price % 1) * 100)"/></span>
+                                        </div>
                                     </div>
                                 </div>
                             </t>
