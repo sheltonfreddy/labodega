@@ -11,7 +11,7 @@
         <field name="page_height">279</field>
         <field name="page_width">216</field>
         <field name="orientation">Portrait</field>
-        <field name="margin_top">9</field>
+        <field name="margin_top">11</field>
         <field name="margin_bottom">20</field>
         <field name="margin_left">1</field>
         <field name="margin_right">5</field>
@@ -41,7 +41,7 @@
                 <style>
                     @page {
                         size: 216mm 279mm;
-                        margin: 9mm 5mm 20mm 1mm;
+                        margin: 11mm 5mm 20mm 0mm;
                     }
                     * {
                         margin: 0;
