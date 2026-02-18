@@ -3,8 +3,8 @@
     <!-- Product Label Report Paperformat -->
     <!-- Sheet: Letter size (8.5" x 11" = 215.9mm x 279.4mm) -->
     <!-- Labels: 5cm x 3cm, 4 columns x 8 rows = 32 labels -->
-    <!-- Top margin: 1mm, Bottom: 2cm, Left: 0.5cm, Right: 0.5cm -->
-    <!-- Horizontal gap: 4mm, Vertical gap: 2mm -->
+    <!-- Top margin: 15mm, Bottom: 20mm, Left: 5mm, Right: 5mm -->
+    <!-- Horizontal gap: 2mm, Vertical gap: 2mm -->
     <record id="paperformat_product_labels" model="report.paperformat">
         <field name="name">Product Labels (5x3cm, 32 per sheet)</field>
         <field name="default" eval="False"/>
@@ -42,14 +42,11 @@
                     Letter sheet: 216mm x 279mm
                     Margins: Top 15mm, Bottom 20mm, Left 5mm, Right 5mm
                     Available width: 216 - 5 - 5 = 206mm
-                    Available height: 279 - 15 - 20 = 244mm
 
                     Labels: 50mm x 30mm (4 columns x 8 rows = 32 per sheet)
                     Horizontal gaps: 2mm x 3 = 6mm
-                    Vertical gaps: 2mm x 7 = 14mm
 
-                    Total width needed: (50 x 4) + (2 x 3) = 206mm ✓
-                    Total height needed: (30 x 8) + (2 x 7) = 254mm (will use 244mm available)
+                    Total width: (50 x 4) + (2 x 3) = 206mm ✓
                 -->
                 <style>
                     @page {
@@ -66,120 +63,99 @@
                         padding: 0;
                         font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
                     }
-                    .label-sheet {
+                    .label-table {
                         width: 206mm;
+                        border-collapse: separate;
+                        border-spacing: 2mm;
+                        table-layout: fixed;
+                        margin: 0;
+                        padding: 0;
                     }
-                    .label-row {
-                        width: 206mm;
-                        height: 30mm;
-                        margin-bottom: 2mm;
-                        page-break-inside: avoid;
-                        display: flex;
-                        flex-direction: row;
-                        justify-content: flex-start;
-                        align-items: stretch;
-                    }
-                    .label-row:last-child {
-                        margin-bottom: 0;
-                    }
-                    .label-cell {
+                    .label-table td {
                         width: 50mm;
-                        min-width: 50mm;
-                        max-width: 50mm;
                         height: 30mm;
-                        min-height: 30mm;
-                        max-height: 30mm;
-                        padding: 1.5mm;
+                        padding: 2mm;
                         border: 0.2pt dashed #bbb;
                         overflow: hidden;
                         background: #fff;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: space-between;
-                        align-items: center;
-                    }
-                    .label-spacer {
-                        width: 2mm;
-                        min-width: 2mm;
-                        max-width: 2mm;
-                        height: 30mm;
+                        vertical-align: middle;
+                        text-align: center;
                     }
                     .product-name {
-                        width: 100%;
-                        font-size: 8pt;
+                        font-size: 9pt;
                         font-weight: 900;
                         text-align: center;
-                        line-height: 1.1;
-                        max-height: 10mm;
+                        line-height: 1.15;
+                        max-height: 11mm;
                         overflow: hidden;
                         word-wrap: break-word;
                         text-transform: uppercase;
                         color: #000;
+                        margin-bottom: 1mm;
                     }
                     .barcode-container {
-                        width: 100%;
                         text-align: center;
-                        flex-grow: 1;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        align-items: center;
+                        margin: 1mm 0;
                     }
                     .barcode-container img {
-                        width: 46mm;
+                        width: 45mm;
                         height: 9mm;
                     }
                     .barcode-text {
-                        font-size: 6pt;
+                        font-size: 7pt;
                         font-weight: bold;
                         text-align: center;
-                        margin-top: 0.5mm;
+                        margin-top: 1mm;
                         font-family: 'Courier New', monospace;
                         letter-spacing: 0.5pt;
                         color: #000;
                     }
                     .price {
-                        font-size: 14pt;
+                        font-size: 16pt;
                         font-weight: 900;
                         text-align: center;
                         color: #000;
                         line-height: 1;
+                        margin-top: 1mm;
                     }
                     .price-currency {
-                        font-size: 9pt;
+                        font-size: 10pt;
                         vertical-align: super;
                     }
                     .price-cents {
-                        font-size: 9pt;
+                        font-size: 10pt;
                         vertical-align: super;
                     }
                     .no-barcode {
-                        font-size: 7pt;
+                        font-size: 8pt;
                         color: #666;
                         text-align: center;
                         font-style: italic;
+                        padding: 3mm 0;
                     }
                     .page-break {
                         page-break-before: always;
-                        height: 0;
+                    }
+                    tr {
+                        page-break-inside: avoid;
                     }
                 </style>
 
-                <div class="label-sheet">
-                    <t t-set="products_list" t-value="list(docs)"/>
-                    <t t-set="total_products" t-value="len(products_list)"/>
+                <t t-set="products_list" t-value="list(docs)"/>
+                <t t-set="total_products" t-value="len(products_list)"/>
 
+                <table class="label-table">
                     <t t-foreach="range(0, total_products, 4)" t-as="start_idx">
                         <!-- Page break after every 32 labels (8 rows) -->
                         <t t-if="start_idx > 0 and start_idx % 32 == 0">
-                            <div class="page-break"/>
+                            <tr><td colspan="4" class="page-break" style="height:0; padding:0; border:none;"/></tr>
                         </t>
 
-                        <div class="label-row">
+                        <tr>
                             <!-- Label 1 -->
-                            <t t-if="start_idx &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx]"/>
-                                <div class="label-cell">
+                            <td>
+                                <t t-if="start_idx &lt; total_products">
+                                    <t t-set="product" t-value="products_list[start_idx]"/>
                                     <div class="product-name"><t t-esc="product.name"/></div>
                                     <div class="barcode-container">
                                         <t t-if="product.barcode">
@@ -193,18 +169,13 @@
                                     <div class="price">
                                         <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span>
                                     </div>
-                                </div>
-                            </t>
-
-                            <!-- Spacer 1 -->
-                            <t t-if="start_idx + 1 &lt; total_products">
-                                <div class="label-spacer"/>
-                            </t>
+                                </t>
+                            </td>
 
                             <!-- Label 2 -->
-                            <t t-if="start_idx + 1 &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx + 1]"/>
-                                <div class="label-cell">
+                            <td>
+                                <t t-if="start_idx + 1 &lt; total_products">
+                                    <t t-set="product" t-value="products_list[start_idx + 1]"/>
                                     <div class="product-name"><t t-esc="product.name"/></div>
                                     <div class="barcode-container">
                                         <t t-if="product.barcode">
@@ -218,18 +189,13 @@
                                     <div class="price">
                                         <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span>
                                     </div>
-                                </div>
-                            </t>
-
-                            <!-- Spacer 2 -->
-                            <t t-if="start_idx + 2 &lt; total_products">
-                                <div class="label-spacer"/>
-                            </t>
+                                </t>
+                            </td>
 
                             <!-- Label 3 -->
-                            <t t-if="start_idx + 2 &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx + 2]"/>
-                                <div class="label-cell">
+                            <td>
+                                <t t-if="start_idx + 2 &lt; total_products">
+                                    <t t-set="product" t-value="products_list[start_idx + 2]"/>
                                     <div class="product-name"><t t-esc="product.name"/></div>
                                     <div class="barcode-container">
                                         <t t-if="product.barcode">
@@ -243,18 +209,13 @@
                                     <div class="price">
                                         <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span>
                                     </div>
-                                </div>
-                            </t>
-
-                            <!-- Spacer 3 -->
-                            <t t-if="start_idx + 3 &lt; total_products">
-                                <div class="label-spacer"/>
-                            </t>
+                                </t>
+                            </td>
 
                             <!-- Label 4 -->
-                            <t t-if="start_idx + 3 &lt; total_products">
-                                <t t-set="product" t-value="products_list[start_idx + 3]"/>
-                                <div class="label-cell">
+                            <td>
+                                <t t-if="start_idx + 3 &lt; total_products">
+                                    <t t-set="product" t-value="products_list[start_idx + 3]"/>
                                     <div class="product-name"><t t-esc="product.name"/></div>
                                     <div class="barcode-container">
                                         <t t-if="product.barcode">
@@ -268,14 +229,13 @@
                                     <div class="price">
                                         <span class="price-currency">$</span><t t-esc="int(product.list_price)"/><span class="price-cents"><t t-esc="'%02d' % int(round((product.list_price % 1) * 100))"/></span>
                                     </div>
-                                </div>
-                            </t>
-                        </div>
+                                </t>
+                            </td>
+                        </tr>
                     </t>
-                </div>
+                </table>
             </div>
         </t>
     </template>
 </odoo>
-
 
