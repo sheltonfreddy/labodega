@@ -15,6 +15,7 @@
                         <field name="vendor_name"/>
                     </group>
                     <group string="Update Options" col="2">
+                        <field name="skip_existing_barcode"/>
                         <field name="update_name"/>
                         <field name="update_cost"/>
                         <field name="update_sale_price"/>

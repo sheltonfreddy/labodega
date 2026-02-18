@@ -11,7 +11,9 @@ class ProductImportWizard(models.TransientModel):
 
     csv_file = fields.Binary(string='CSV File', required=True)
     csv_filename = fields.Char(string='Filename')
-    vendor_name = fields.Char(string='Vendor Name', default='DIAZ FOODS', required=True)
+    vendor_name = fields.Char(string='Vendor Name', required=True)
+    skip_existing_barcode = fields.Boolean(string='Skip Existing Barcodes', default=False,
+                                           help='If checked, rows with barcodes that already exist in the database will be skipped')
     update_name = fields.Boolean(string='Update Product Name', default=True)
     update_cost = fields.Boolean(string='Update Cost', default=True)
     update_sale_price = fields.Boolean(string='Update Sale Price', default=True)
@@ -28,21 +30,20 @@ class ProductImportWizard(models.TransientModel):
         ('done', 'Done'),
     ], default='draft')
 
-    # CSV Column indices (0-based) - Updated for new CSV format
-    # Col E (4): Scale Reads - Barcode
-    # Col F (5): Description 1 - Name
-    # Col N (13): Unit Cost
-    # Col P (15): Sale Price35
-    # Col Q (16): Product Category
-    # Col R (17): Point of Sale Category
-    # Col S (18): Available in POS
-    COL_BARCODE = 4       # Scale Reads (Col E)
-    COL_NAME = 5          # Description 1 (Col F)
-    COL_UNIT_COST = 13    # Unit Cost (Col N)
-    COL_SALE_PRICE = 15   # Sale Price35 (Col P)
-    COL_CATEGORY = 16     # Product Category (Col Q)
-    COL_POS_CATEGORY = 17 # Point of Sale Category (Col R)
-    COL_AVAILABLE_POS = 18 # Available in POS (Col S)
+    # CSV Column indices (0-based) - Simple template format
+    # Col 0: Product Name
+    # Col 1: Barcode
+    # Col 2: Unit Cost
+    # Col 3: Sale Price
+    # Col 4: Product Category
+    # Col 5: Point of Sale Category
+    # Available in POS = TRUE by default for all products
+    COL_NAME = 0          # Product Name
+    COL_BARCODE = 1       # Barcode
+    COL_UNIT_COST = 2     # Unit Cost
+    COL_SALE_PRICE = 3    # Sale Price
+    COL_CATEGORY = 4      # Product Category
+    COL_POS_CATEGORY = 5  # Point of Sale Category
 
     def _clean_price(self, price_str):
         """Remove $ and convert to float"""
@@ -143,19 +144,18 @@ class ProductImportWizard(models.TransientModel):
 
         for row_num, row in enumerate(reader, start=2):
             try:
-                if len(row) < 16:
+                if len(row) < 2:  # At minimum need Name and Barcode
                     skipped += 1
                     continue
 
-                # New column indices
-                barcode = self._clean_barcode(row[self.COL_BARCODE])  # Col I - Scale Reads
-                name = self._clean_name(row[self.COL_NAME])           # Col J - Description 1
-                unit_cost = self._clean_price(row[self.COL_UNIT_COST]) if len(row) > self.COL_UNIT_COST else None  # Col R
-                sale_price = self._clean_price(row[self.COL_SALE_PRICE]) if len(row) > self.COL_SALE_PRICE else None  # Col S
-                category_name = row[self.COL_CATEGORY].strip() if len(row) > self.COL_CATEGORY else ''  # Col U
-                pos_category_name = row[self.COL_POS_CATEGORY].strip() if len(row) > self.COL_POS_CATEGORY else ''  # Col V
-                available_in_pos_str = row[self.COL_AVAILABLE_POS].strip().upper() if len(row) > self.COL_AVAILABLE_POS else 'TRUE'  # Col W
-                available_in_pos = available_in_pos_str in ('TRUE', 'YES', '1')
+                # Simple template columns
+                name = self._clean_name(row[self.COL_NAME])           # Col 0 - Product Name
+                barcode = self._clean_barcode(row[self.COL_BARCODE])  # Col 1 - Barcode
+                unit_cost = self._clean_price(row[self.COL_UNIT_COST]) if len(row) > self.COL_UNIT_COST else None  # Col 2
+                sale_price = self._clean_price(row[self.COL_SALE_PRICE]) if len(row) > self.COL_SALE_PRICE else None  # Col 3
+                category_name = row[self.COL_CATEGORY].strip() if len(row) > self.COL_CATEGORY else ''  # Col 4
+                pos_category_name = row[self.COL_POS_CATEGORY].strip() if len(row) > self.COL_POS_CATEGORY else ''  # Col 5
+                available_in_pos = True  # Default TRUE for all products
 
                 # Skip rows without barcode or name
                 if not barcode or not name:
@@ -174,6 +174,11 @@ class ProductImportWizard(models.TransientModel):
 
                 # Search for existing product by barcode
                 existing_product = ProductProduct.search([('barcode', '=', barcode)], limit=1)
+
+                # Skip if barcode exists and skip_existing_barcode is checked
+                if existing_product and self.skip_existing_barcode:
+                    skipped += 1
+                    continue
 
                 if existing_product:
                     # Update existing product
