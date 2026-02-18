@@ -97,7 +97,7 @@
                                             vertical-align: top;
                                         ">
                                             <t t-if="product.barcode">
-                                                <img t-attf-src="/report/barcode/?barcode_type=Code128&amp;value={{product.barcode}}&amp;width=250&amp;height=60&amp;humanreadable=0" style="width: 30mm; height: 9mm;"/>
+                                                <span t-field="product.barcode" t-options="{'widget': 'barcode', 'width': 120, 'height': 35, 'humanreadable': 0}"/>
                                                 <div style="font-size: 6pt; font-family: monospace; margin-top: 0.5mm;"><t t-esc="product.barcode"/></div>
                                             </t>
                                             <t t-else="">
@@ -105,11 +105,11 @@
                                             </t>
                                         </div>
 
-                                        <!-- Price -->
+                                        <!-- Price - moved up and 10mm left -->
                                         <div style="
                                             position: absolute;
-                                            bottom: 1mm;
-                                            right: 2mm;
+                                            bottom: 5mm;
+                                            right: 12mm;
                                             text-align: right;
                                         ">
                                             <span style="font-size: 16pt; font-weight: 900;">
