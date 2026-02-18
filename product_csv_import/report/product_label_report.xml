@@ -41,7 +41,7 @@
                 <style>
                     @page {
                         size: 216mm 279mm;
-                        margin: 13mm 5mm 20mm 5mm;
+                        margin: 13mm 2mm 20mm 2mm;
                     }
                     * {
                         margin: 0;
