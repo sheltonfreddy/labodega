@@ -11,7 +11,7 @@
         <field name="page_height">279</field>
         <field name="page_width">216</field>
         <field name="orientation">Portrait</field>
-        <field name="margin_top">15</field>
+        <field name="margin_top">13</field>
         <field name="margin_bottom">20</field>
         <field name="margin_left">5</field>
         <field name="margin_right">5</field>
@@ -41,7 +41,7 @@
                 <style>
                     @page {
                         size: 216mm 279mm;
-                        margin: 15mm 5mm 20mm 5mm;
+                        margin: 13mm 5mm 20mm 5mm;
                     }
                     * {
                         margin: 0;
@@ -66,7 +66,7 @@
                     }
                     .label-row {
                         width: 206mm;
-                        height: 30mm;
+                        height: 26mm;
                         margin-bottom: 2mm;
                         position: relative;
                         page-break-inside: avoid;
@@ -81,9 +81,9 @@
                         width: 50mm !important;
                         min-width: 50mm !important;
                         max-width: 50mm !important;
-                        height: 30mm !important;
-                        min-height: 30mm !important;
-                        max-height: 30mm !important;
+                        height: 26mm !important;
+                        min-height: 26mm !important;
+                        max-height: 26mm !important;
                         overflow: hidden;
                         border: 0.5pt dashed #ccc;
                         margin-right: 2mm;
@@ -95,30 +95,31 @@
                         margin-right: 0;
                     }
 
-                    /* Top section - 10mm for product name */
+                    /* Top section - 8mm for product name */
                     .label-top {
                         width: 50mm !important;
-                        height: 10mm !important;
+                        height: 8mm !important;
                         padding: 1mm 2mm;
                         overflow: hidden;
                     }
                     .product-name {
-                        font-size: 8pt;
+                        font-size: 7pt;
                         font-weight: 900;
                         text-align: center;
                         line-height: 1.1;
                         text-transform: uppercase;
                         color: #000;
-                        max-height: 8mm;
+                        max-height: 6mm;
                         overflow: hidden;
                         word-wrap: break-word;
                     }
-                    /* Bottom section - 20mm for barcode and price */
+                    /* Bottom section - 18mm for barcode and price */
                     .label-bottom {
                         width: 50mm !important;
-                        height: 20mm !important;
+                        height: 18mm !important;
                         padding: 1mm;
                         position: relative;
+                        overflow: hidden;
                     }
                     .barcode-area {
                         width: 32mm;
@@ -127,11 +128,11 @@
                         vertical-align: top;
                     }
                     .barcode-area img {
-                        width: 30mm;
-                        height: 10mm;
+                        width: 28mm;
+                        height: 8mm;
                     }
                     .barcode-text {
-                        font-size: 6pt;
+                        font-size: 5pt;
                         font-weight: bold;
                         text-align: center;
                         font-family: 'Courier New', monospace;
@@ -140,25 +141,25 @@
                     }
                     .price-area {
                         position: absolute;
-                        bottom: 1mm;
+                        bottom: 2mm;
                         right: 2mm;
                         text-align: right;
                     }
                     .price {
-                        font-size: 18pt;
+                        font-size: 16pt;
                         font-weight: 900;
                         color: #000;
                         line-height: 1;
                         white-space: nowrap;
                     }
                     .price-currency {
-                        font-size: 11pt;
+                        font-size: 10pt;
                     }
                     .price-cents {
-                        font-size: 11pt;
+                        font-size: 10pt;
                         vertical-align: top;
                         position: relative;
-                        top: -3pt;
+                        top: -2pt;
                     }
                     .no-barcode {
                         font-size: 7pt;
