@@ -61,6 +61,13 @@ class BarcodeUpdateWizard(models.TransientModel):
         if len(header) < 2:
             raise UserError(_('CSV must have at least 2 columns: Current Barcode, New Barcode'))
 
+        # Check if product_id column exists (look for it in any position)
+        product_id_col = None
+        for idx, col in enumerate(header):
+            if 'product_id' in col.lower().replace(' ', '_'):
+                product_id_col = idx
+                break
+
         lines_data = []
         new_barcodes = {}  # Track duplicates
         total_rows = 0
@@ -77,13 +84,39 @@ class BarcodeUpdateWizard(models.TransientModel):
             current_barcode = row[0].strip() if row[0] else ''
             new_barcode = row[1].strip() if row[1] else ''
 
-            if not current_barcode:
+            # Try to get product_id from CSV if column exists
+            product_id_from_csv = None
+            if product_id_col is not None and len(row) > product_id_col:
+                try:
+                    product_id_from_csv = int(row[product_id_col].strip())
+                except (ValueError, TypeError):
+                    pass
+
+            if not current_barcode and not product_id_from_csv:
                 continue
 
             total_rows += 1
 
-            # Find product by current barcode
-            product = ProductProduct.search([('barcode', '=', current_barcode)], limit=1)
+            # Find product - prefer product_id if available, fallback to barcode search
+            product = None
+            if product_id_from_csv:
+                product = ProductProduct.browse(product_id_from_csv).exists()
+
+            if not product and current_barcode:
+                # Try exact match first
+                product = ProductProduct.search([('barcode', '=', current_barcode)], limit=1)
+
+                # If not found and barcode starts with 0, try without leading zeros
+                if not product and current_barcode.startswith('0'):
+                    barcode_no_zeros = current_barcode.lstrip('0')
+                    product = ProductProduct.search([('barcode', '=', barcode_no_zeros)], limit=1)
+
+                # If not found and barcode doesn't start with 0, try with leading zeros
+                if not product and not current_barcode.startswith('0'):
+                    # Try adding leading zeros to make it 12 digits
+                    if len(current_barcode) < 12:
+                        barcode_with_zeros = current_barcode.zfill(12)
+                        product = ProductProduct.search([('barcode', '=', barcode_with_zeros)], limit=1)
 
             status = 'ready'
             notes = ''
@@ -107,6 +140,10 @@ class BarcodeUpdateWizard(models.TransientModel):
                 elif new_barcode == current_barcode:
                     status = 'skip'
                     notes = 'New barcode same as current'
+                # Check if new barcode same as product's current barcode
+                elif new_barcode == product.barcode:
+                    status = 'skip'
+                    notes = 'New barcode same as current product barcode'
                 # Check for duplicate new barcodes in this file
                 elif new_barcode in new_barcodes:
                     status = 'duplicate'
@@ -233,4 +270,7 @@ class BarcodeUpdateWizardLine(models.TransientModel):
         ('conflict', 'Conflict'),
     ], string='Status', default='ready')
     notes = fields.Char(string='Notes')
+
+
+
 
