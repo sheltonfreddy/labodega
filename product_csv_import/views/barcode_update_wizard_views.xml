@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Barcode Update Wizard Form View -->
+    <record id="barcode_update_wizard_form" model="ir.ui.view">
+        <field name="name">barcode.update.wizard.form</field>
+        <field name="model">barcode.update.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Update Product Barcodes">
+                <!-- Upload State -->
+                <div invisible="state != 'draft'">
+                    <group>
+                        <group>
+                            <field name="csv_file" filename="csv_filename"/>
+                            <field name="csv_filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <strong>CSV Format:</strong>
+                        <ul>
+                            <li>Column 1: Current Barcode (to find the product)</li>
+                            <li>Column 2: New Barcode (to update to)</li>
+                        </ul>
+                        <p>First row should be header and will be skipped.</p>
+                    </div>
+                </div>
+
+                <!-- Preview State -->
+                <div invisible="state != 'preview'">
+                    <group>
+                        <group>
+                            <field name="total_rows"/>
+                            <field name="products_found"/>
+                        </group>
+                        <group>
+                            <field name="products_not_found"/>
+                            <field name="duplicates_found"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="All Rows" name="all_rows">
+                            <field name="preview_line_ids" nolabel="1">
+                                <list editable="bottom" decoration-success="status == 'ready'" decoration-danger="status in ('not_found', 'conflict', 'duplicate')" decoration-muted="status == 'skip'">
+                                    <field name="row_number" readonly="1"/>
+                                    <field name="current_barcode" readonly="1"/>
+                                    <field name="new_barcode"/>
+                                    <field name="product_name" readonly="1"/>
+                                    <field name="status" readonly="1"/>
+                                    <field name="notes" readonly="1"/>
+                                    <field name="product_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Ready to Update" name="ready">
+                            <field name="preview_line_ids" nolabel="1" domain="[('status', '=', 'ready')]">
+                                <list decoration-success="status == 'ready'">
+                                    <field name="row_number"/>
+                                    <field name="current_barcode"/>
+                                    <field name="new_barcode"/>
+                                    <field name="product_name"/>
+                                    <field name="product_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Issues" name="issues">
+                            <field name="preview_line_ids" nolabel="1" domain="[('status', 'in', ['not_found', 'conflict', 'duplicate'])]">
+                                <list decoration-danger="1">
+                                    <field name="row_number"/>
+                                    <field name="current_barcode"/>
+                                    <field name="new_barcode"/>
+                                    <field name="status"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </div>
+
+                <!-- Done State -->
+                <div invisible="state != 'done'">
+                    <group>
+                        <field name="result_message" nolabel="1" colspan="2" widget="text"/>
+                    </group>
+                </div>
+
+                <field name="state" invisible="1"/>
+
+                <footer>
+                    <button name="action_preview" string="Preview Changes" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_apply" string="Apply Updates" type="object" class="btn-primary" invisible="state != 'preview'"/>
+                    <button name="action_back" string="Back" type="object" class="btn-secondary" invisible="state not in ('preview', 'done')"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Wizard Action -->
+    <record id="action_barcode_update_wizard" model="ir.actions.act_window">
+        <field name="name">Update Barcodes</field>
+        <field name="res_model">barcode.update.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menu Item -->
+    <menuitem id="menu_barcode_update_wizard"
+              name="Update Barcodes (CSV)"
+              parent="stock.menu_stock_inventory_control"
+              action="action_barcode_update_wizard"
+              sequence="99"/>
+
+</odoo>
