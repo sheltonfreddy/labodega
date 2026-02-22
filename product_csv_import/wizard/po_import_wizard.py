@@ -466,27 +466,32 @@ class POImportWizard(models.TransientModel):
                     current_cost = product.standard_price or 0.0
                     current_sale_price = product.list_price or 0.0
 
-                    # Calculate current margin if both prices exist
+                    # Calculate current/old margin (based on old cost and old price)
                     if current_sale_price > 0 and current_cost > 0:
                         current_margin = ((current_sale_price - current_cost) / current_sale_price) * 100
                     else:
-                        current_margin = self.default_margin
+                        current_margin = 0.0
 
-                    # For preview, show what the new sale price would be using existing margin
-                    if unit_cost > 0 and current_margin > 0 and current_margin < 100:
-                        new_sale_price = unit_cost / (1 - current_margin / 100)
+                    # Calculate NEW margin based on NEW cost and EXISTING sale price
+                    # This shows what the margin would be if we keep the same sale price but cost changed
+                    if current_sale_price > 0 and unit_cost > 0:
+                        new_margin = ((current_sale_price - unit_cost) / current_sale_price) * 100
                     else:
-                        new_sale_price = current_sale_price
+                        new_margin = current_margin if current_margin else self.default_margin
+
+                    # New sale price = existing sale price (user can edit margin to recalculate)
+                    new_sale_price = current_sale_price
 
                 elif self.create_missing_products:
                     status = 'new'
                     status_message = 'Will create new product'
                     current_cost = 0.0
                     current_sale_price = 0.0
-                    current_margin = self.default_margin
+                    current_margin = 0.0
+                    new_margin = self.default_margin
                     # Calculate sale price for new product using default margin
-                    if unit_cost > 0 and current_margin < 100:
-                        new_sale_price = unit_cost / (1 - current_margin / 100)
+                    if unit_cost > 0 and new_margin < 100:
+                        new_sale_price = unit_cost / (1 - new_margin / 100)
                     else:
                         new_sale_price = 0.0
                 else:
@@ -495,6 +500,7 @@ class POImportWizard(models.TransientModel):
                     current_cost = 0.0
                     current_sale_price = 0.0
                     current_margin = 0.0
+                    new_margin = 0.0
                     new_sale_price = 0.0
 
                 preview_lines.append({
@@ -511,7 +517,7 @@ class POImportWizard(models.TransientModel):
                     'current_sale_price': current_sale_price,
                     'current_margin': current_margin,
                     'sale_price': new_sale_price,
-                    'margin_percent': current_margin,
+                    'margin_percent': new_margin,
                     'update_price': status == 'new',  # Auto-check for new products
                     'status': status,
                     'status_message': status_message,
