@@ -3,6 +3,8 @@ access_product_import_wizard,product.import.wizard.access,model_product_import_w
 access_product_label_wizard,product.label.wizard.access,model_product_label_wizard,base.group_user,1,1,1,1
 access_barcode_update_wizard,barcode.update.wizard.access,model_barcode_update_wizard,base.group_user,1,1,1,1
 access_barcode_update_wizard_line,barcode.update.wizard.line.access,model_barcode_update_wizard_line,base.group_user,1,1,1,1
+access_po_import_wizard,po.import.wizard.access,model_po_import_wizard,purchase.group_purchase_user,1,1,1,1
+access_po_import_wizard_line,po.import.wizard.line.access,model_po_import_wizard_line,purchase.group_purchase_user,1,1,1,1
 
 
 

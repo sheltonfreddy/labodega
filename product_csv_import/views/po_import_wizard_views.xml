@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- PO Import Wizard Form View -->
+    <record id="view_po_import_wizard_form" model="ir.ui.view">
+        <field name="name">po.import.wizard.form</field>
+        <field name="model">po.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Purchase Order from CSV">
+                <!-- DRAFT STATE - Upload CSV -->
+                <group invisible="state != 'draft'">
+                    <group string="CSV File">
+                        <field name="csv_file" filename="csv_filename" widget="binary"/>
+                        <field name="csv_filename" invisible="1"/>
+                    </group>
+                    <group string="Vendor">
+                        <field name="vendor_id" options="{'no_create': True}"/>
+                    </group>
+                    <group string="Import Options" col="2">
+                        <field name="create_missing_products"/>
+                        <field name="update_vendor_pricelist"/>
+                        <field name="auto_confirm_po"/>
+                    </group>
+                    <group string="CSV Template Format" col="1">
+                        <div class="alert alert-info" role="alert">
+                            <strong>Required CSV Columns:</strong>
+                            <ol>
+                                <li><strong>Vendor Item Code</strong> - Vendor's product code</li>
+                                <li><strong>Product Name</strong> - Product description</li>
+                                <li><strong>Barcode</strong> - Product barcode (primary match key)</li>
+                                <li><strong>Quantity</strong> - Order quantity</li>
+                                <li><strong>Unit Cost</strong> - Cost per unit</li>
+                            </ol>
+                            <p class="mb-0"><em>Products are matched by Barcode first, then by Vendor Item Code.</em></p>
+                        </div>
+                    </group>
+                </group>
+
+                <!-- PREVIEW STATE - Review before import -->
+                <group invisible="state != 'preview'">
+                    <group string="Import Summary" col="4">
+                        <field name="vendor_id" readonly="1"/>
+                        <field name="preview_total" widget="monetary"/>
+                        <div class="text-center">
+                            <span class="badge bg-success me-1">✅ Matched: <field name="preview_count_matched" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-primary me-1">🆕 New: <field name="preview_count_new" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-danger">❌ Errors: <field name="preview_count_error" nolabel="1" class="oe_inline"/></span>
+                        </div>
+                    </group>
+                    <group string="Preview Lines" col="1">
+                        <field name="preview_line_ids" nolabel="1">
+                            <tree decoration-success="status == 'matched'" decoration-info="status == 'new'" decoration-danger="status == 'error'" editable="bottom">
+                                <field name="status" column_invisible="1"/>
+                                <field name="vendor_code"/>
+                                <field name="name"/>
+                                <field name="barcode"/>
+                                <field name="quantity"/>
+                                <field name="unit_cost"/>
+                                <field name="line_total" sum="Total"/>
+                                <field name="product_id" optional="show"/>
+                                <field name="status_message"/>
+                            </tree>
+                        </field>
+                    </group>
+                </group>
+
+                <!-- DONE STATE - Results -->
+                <group invisible="state != 'done'">
+                    <field name="result_message" widget="text" readonly="1" nolabel="1"/>
+                    <field name="created_po_id" invisible="1"/>
+                </group>
+                <field name="state" invisible="1"/>
+
+                <footer>
+                    <!-- Draft state buttons -->
+                    <button name="action_preview" string="Preview Import" type="object"
+                            class="btn-primary" invisible="state != 'draft'"/>
+
+                    <!-- Preview state buttons -->
+                    <button name="action_import" string="Confirm &amp; Create PO" type="object"
+                            class="btn-success" invisible="state != 'preview'"/>
+                    <button name="action_back_to_draft" string="← Back" type="object"
+                            class="btn-secondary" invisible="state != 'preview'"/>
+
+                    <!-- Done state buttons -->
+                    <button name="action_view_po" string="View Purchase Order" type="object"
+                            class="btn-success" invisible="state != 'done' or not created_po_id"/>
+                    <button name="action_reset" string="Import Another File" type="object"
+                            class="btn-secondary" invisible="state != 'done'"/>
+
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action to open the wizard -->
+    <record id="action_po_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import PO from CSV</field>
+        <field name="res_model">po.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menu Item under Purchase > Orders -->
+    <menuitem id="menu_po_import_wizard"
+              name="Import PO (CSV)"
+              parent="purchase.menu_procurement_management"
+              action="action_po_import_wizard"
+              sequence="50"/>
+
+</odoo>
+

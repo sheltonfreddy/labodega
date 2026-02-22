@@ -17,10 +17,13 @@
                     <div class="alert alert-info" role="alert">
                         <strong>CSV Format:</strong>
                         <ul>
-                            <li>Column 1: Current Barcode (to find the product)</li>
-                            <li>Column 2: New Barcode (to update to)</li>
+                            <li>Column 1: Current Barcode</li>
+                            <li>Column 2: New Barcode</li>
+                            <li>Column 3: Product Name (optional, for reference)</li>
+                            <li>Column 4: <b>product_id</b> (recommended - ensures correct product match)</li>
                         </ul>
                         <p>First row should be header and will be skipped.</p>
+                        <p><i>Tip: If product_id column is present, it will be used for matching instead of barcode search.</i></p>
                     </div>
                 </div>
 
@@ -111,3 +114,4 @@
               sequence="99"/>
 
 </odoo>
+
