@@ -15,6 +15,8 @@
                 <field name="current_sale_price" readonly="1" optional="show" string="Old Price"/>
                 <field name="margin_percent" string="Margin %"/>
                 <field name="sale_price" string="New Price"/>
+                <field name="category_id" string="Category" optional="show"/>
+                <field name="pos_category_id" string="POS Category" optional="show"/>
                 <field name="update_price" string="Update"/>
                 <field name="product_id" readonly="1" optional="hide"/>
                 <field name="status" readonly="1"/>
@@ -50,15 +52,17 @@
                     </group>
                     <group string="CSV Template Format" col="1">
                         <div class="alert alert-info" role="alert">
-                            <strong>Required CSV Columns:</strong>
+                            <strong>CSV Columns:</strong>
                             <ol>
                                 <li><strong>Vendor Item Code</strong> - Vendor's product code</li>
                                 <li><strong>Product Name</strong> - Product description</li>
                                 <li><strong>Barcode</strong> - Product barcode (primary match key)</li>
                                 <li><strong>Quantity</strong> - Order quantity</li>
                                 <li><strong>Unit Cost</strong> - Cost per unit</li>
+                                <li><strong>Category</strong> - Product category (optional)</li>
+                                <li><strong>POS Category</strong> - POS category (optional)</li>
                             </ol>
-                            <p class="mb-0"><em>Products are matched by Barcode first, then by Vendor Item Code.</em></p>
+                            <p class="mb-0"><em>Products are matched by Barcode first, then by Vendor Item Code. New products will be available in POS by default.</em></p>
                         </div>
                     </group>
                 </group>

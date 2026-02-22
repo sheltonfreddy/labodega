@@ -1,5 +1,5 @@
-Vendor Item Code,Product Name,Barcode,Quantity,Unit Cost
-LT-1234,Corn Tortilla 5lb,0012345678905,10,12.50
-LT-5678,Flour Tortilla 10pk,0098765432109,5,8.99
-LT-9999,Masa Harina 10lb,,20,15.00
+Vendor Item Code,Product Name,Barcode,Quantity,Unit Cost,Category,POS Category
+LT-1234,Corn Tortilla 5lb,0012345678905,10,12.50,Grocery,Tortillas
+LT-5678,Flour Tortilla 10pk,0098765432109,5,8.99,Grocery,Tortillas
+LT-9999,Masa Harina 10lb,,20,15.00,Grocery,Baking
 

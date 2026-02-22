@@ -18,6 +18,10 @@ class POImportWizardLine(models.TransientModel):
     line_total = fields.Float(string='Total', compute='_compute_line_total')
     product_id = fields.Many2one('product.product', string='Matched Product')
 
+    # Category fields
+    category_id = fields.Many2one('product.category', string='Category')
+    pos_category_id = fields.Many2one('pos.category', string='POS Category')
+
     # Price and Margin fields
     current_cost = fields.Float(string='Current Cost', readonly=True,
                                  help='Current cost in Odoo')
@@ -135,12 +139,14 @@ class POImportWizard(models.TransientModel):
             wizard.preview_count_error = len(wizard.preview_line_ids.filtered(lambda l: l.status == 'error'))
 
     # CSV Column indices (0-based)
-    # Template: Vendor Item Code, Product Name, Barcode, Quantity, Unit Cost
+    # Template: Vendor Item Code, Product Name, Barcode, Quantity, Unit Cost, Category, POS Category
     COL_VENDOR_CODE = 0    # Vendor's item code
     COL_NAME = 1           # Product Name
     COL_BARCODE = 2        # Barcode (primary match key)
     COL_QTY = 3            # Quantity
     COL_UNIT_COST = 4      # Unit Cost
+    COL_CATEGORY = 5       # Product Category (optional)
+    COL_POS_CATEGORY = 6   # POS Category (optional)
 
     def _clean_price(self, price_str):
         """Remove $ and convert to float"""
@@ -172,6 +178,26 @@ class POImportWizard(models.TransientModel):
         if not text_str:
             return ''
         return ' '.join(str(text_str).split())
+
+    def _find_or_create_category(self, category_name):
+        """Find category by name or create if not exists"""
+        if not category_name:
+            return None
+        Category = self.env['product.category']
+        category = Category.search([('name', '=ilike', category_name)], limit=1)
+        if not category:
+            category = Category.create({'name': category_name})
+        return category
+
+    def _find_or_create_pos_category(self, pos_category_name):
+        """Find POS category by name or create if not exists"""
+        if not pos_category_name:
+            return None
+        PosCategory = self.env['pos.category']
+        pos_category = PosCategory.search([('name', '=ilike', pos_category_name)], limit=1)
+        if not pos_category:
+            pos_category = PosCategory.create({'name': pos_category_name})
+        return pos_category
 
     # ========================================================================
     # Barcode Normalization Functions (from scale_bridge.py)
@@ -403,6 +429,14 @@ class POImportWizard(models.TransientModel):
                 qty = self._clean_qty(row[self.COL_QTY])
                 unit_cost = self._clean_price(row[self.COL_UNIT_COST]) if len(row) > self.COL_UNIT_COST else 0.0
 
+                # Parse optional category columns
+                category_name = self._clean_text(row[self.COL_CATEGORY]) if len(row) > self.COL_CATEGORY else ''
+                pos_category_name = self._clean_text(row[self.COL_POS_CATEGORY]) if len(row) > self.COL_POS_CATEGORY else ''
+
+                # Find or create categories
+                category = self._find_or_create_category(category_name) if category_name else None
+                pos_category = self._find_or_create_pos_category(pos_category_name) if pos_category_name else None
+
                 if not name:
                     continue
 
@@ -469,6 +503,8 @@ class POImportWizard(models.TransientModel):
                     'quantity': qty,
                     'unit_cost': unit_cost,
                     'product_id': product.id if product else False,
+                    'category_id': category.id if category else (product.categ_id.id if product else False),
+                    'pos_category_id': pos_category.id if pos_category else (product.pos_categ_ids[0].id if product and product.pos_categ_ids else False),
                     'current_cost': current_cost,
                     'current_sale_price': current_sale_price,
                     'sale_price': new_sale_price,
@@ -539,10 +575,12 @@ class POImportWizard(models.TransientModel):
                     # Normalize barcode before creating new product
                     normalized_barcode = self._normalize_upc_barcode(barcode) if barcode else barcode
 
-                    # Create product with sale price from preview line
+                    # Create product with sale price and categories from preview line
                     product = self._create_product_with_price(
                         name, normalized_barcode, unit_cost,
-                        line.sale_price, vendor_code
+                        line.sale_price, vendor_code,
+                        category_id=line.category_id.id if line.category_id else False,
+                        pos_category_id=line.pos_category_id.id if line.pos_category_id else False
                     )
                     products_created += 1
                 elif product:
@@ -557,6 +595,14 @@ class POImportWizard(models.TransientModel):
                     if self.update_product_prices and line.update_price:
                         if self._update_product_prices(product, unit_cost, line.sale_price):
                             prices_updated += 1
+
+                    # Update categories if specified in preview line
+                    if line.category_id and line.category_id != product.categ_id:
+                        product.write({'categ_id': line.category_id.id})
+                    if line.pos_category_id:
+                        current_pos_cats = product.pos_categ_ids.ids
+                        if line.pos_category_id.id not in current_pos_cats:
+                            product.write({'pos_categ_ids': [(4, line.pos_category_id.id)]})
                 else:
                     errors.append(f"Line {line.name}: Product not found")
                     skipped += 1
@@ -626,8 +672,8 @@ class POImportWizard(models.TransientModel):
             'target': 'new',
         }
 
-    def _create_product_with_price(self, name, barcode, cost, sale_price, vendor_code):
-        """Create a new product with cost and sale price"""
+    def _create_product_with_price(self, name, barcode, cost, sale_price, vendor_code, category_id=False, pos_category_id=False):
+        """Create a new product with cost, sale price, and categories"""
         vals = {
             'name': name,
             'barcode': barcode if barcode else False,
@@ -637,6 +683,10 @@ class POImportWizard(models.TransientModel):
             'available_in_pos': True,
             'default_code': vendor_code if not barcode else False,
         }
+        if category_id:
+            vals['categ_id'] = category_id
+        if pos_category_id:
+            vals['pos_categ_ids'] = [(6, 0, [pos_category_id])]
         return self.env['product.product'].create(vals)
 
     def _update_product_prices(self, product, cost, sale_price):
