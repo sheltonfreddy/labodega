@@ -71,50 +71,50 @@
                 </group>
 
                 <!-- PREVIEW STATE - Review before import -->
-                <sheet invisible="state != 'preview'">
-                    <div class="oe_title">
-                        <h2>Preview Import for <field name="vendor_id" readonly="1" class="oe_inline" options="{'no_open': True}"/></h2>
-                    </div>
+                <group invisible="state != 'preview'" string="Preview Import">
                     <group col="4">
+                        <field name="vendor_id" readonly="1"/>
                         <field name="preview_total" widget="monetary" string="PO Total"/>
                         <field name="update_product_prices"/>
                         <field name="default_margin" invisible="not update_product_prices"/>
+                    </group>
+                    <group col="1">
                         <div class="text-center">
-                            <span class="badge bg-success me-1">✅ <field name="preview_count_matched" nolabel="1" class="oe_inline"/></span>
-                            <span class="badge bg-primary me-1">🆕 <field name="preview_count_new" nolabel="1" class="oe_inline"/></span>
-                            <span class="badge bg-danger">❌ <field name="preview_count_error" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-success me-1">✅ Matched: <field name="preview_count_matched" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-primary me-1">🆕 New: <field name="preview_count_new" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-danger">❌ Errors: <field name="preview_count_error" nolabel="1" class="oe_inline"/></span>
                         </div>
                     </group>
-                    <notebook>
-                        <page string="Products" name="products">
-                            <field name="preview_line_ids" nolabel="1" widget="one2many">
-                                <list editable="bottom">
-                                    <field name="name" readonly="1" string="Product"/>
-                                    <field name="quantity" readonly="1" string="Qty" width="50px"/>
-                                    <field name="unit_cost" readonly="1" string="Cost" width="70px"/>
-                                    <field name="margin_percent" string="Margin %" width="70px"/>
-                                    <field name="sale_price" string="Price" width="70px"/>
-                                    <field name="update_price" string="Upd" width="40px"/>
-                                    <field name="status" readonly="1" width="70px"/>
-                                </list>
-                            </field>
-                        </page>
-                        <page string="Details" name="details">
-                            <field name="preview_line_ids" nolabel="1" widget="one2many">
-                                <list editable="bottom">
-                                    <field name="name" readonly="1" string="Product"/>
-                                    <field name="barcode" readonly="1"/>
-                                    <field name="vendor_code" readonly="1"/>
-                                    <field name="category_id" string="Category"/>
-                                    <field name="pos_category_id" string="POS Cat"/>
-                                    <field name="current_cost" readonly="1" string="Old Cost"/>
-                                    <field name="current_sale_price" readonly="1" string="Old Price"/>
-                                    <field name="status_message" readonly="1"/>
-                                </list>
-                            </field>
-                        </page>
-                    </notebook>
-                </sheet>
+                </group>
+                <notebook invisible="state != 'preview'">
+                    <page string="Products" name="products">
+                        <field name="preview_line_ids" nolabel="1" widget="one2many">
+                            <list editable="bottom">
+                                <field name="name" readonly="1" string="Product"/>
+                                <field name="quantity" readonly="1" string="Qty"/>
+                                <field name="unit_cost" readonly="1" string="Cost"/>
+                                <field name="margin_percent" string="Margin %"/>
+                                <field name="sale_price" string="Price"/>
+                                <field name="update_price" string="Upd"/>
+                                <field name="status" readonly="1"/>
+                            </list>
+                        </field>
+                    </page>
+                    <page string="Details" name="details">
+                        <field name="preview_line_ids" nolabel="1" widget="one2many">
+                            <list editable="bottom">
+                                <field name="name" readonly="1" string="Product"/>
+                                <field name="barcode" readonly="1"/>
+                                <field name="vendor_code" readonly="1"/>
+                                <field name="category_id" string="Category"/>
+                                <field name="pos_category_id" string="POS Cat"/>
+                                <field name="current_cost" readonly="1" string="Old Cost"/>
+                                <field name="current_sale_price" readonly="1" string="Old Price"/>
+                                <field name="status_message" readonly="1"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
 
                 <!-- DONE STATE - Results -->
                 <group invisible="state != 'done'">
