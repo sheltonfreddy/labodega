@@ -27,6 +27,8 @@ class POImportWizardLine(models.TransientModel):
                                  help='Current cost in Odoo')
     current_sale_price = fields.Float(string='Current Sale Price', readonly=True,
                                        help='Current sale price in Odoo')
+    current_margin = fields.Float(string='Current Margin %', readonly=True,
+                                   help='Current margin in Odoo')
     sale_price = fields.Float(string='New Sale Price',
                               help='Sale price to set (leave 0 to keep existing)')
     margin_percent = fields.Float(string='Margin %',
@@ -507,6 +509,7 @@ class POImportWizard(models.TransientModel):
                     'pos_category_id': pos_category.id if pos_category else (product.pos_categ_ids[0].id if product and product.pos_categ_ids else False),
                     'current_cost': current_cost,
                     'current_sale_price': current_sale_price,
+                    'current_margin': current_margin,
                     'sale_price': new_sale_price,
                     'margin_percent': current_margin,
                     'update_price': status == 'new',  # Auto-check for new products
