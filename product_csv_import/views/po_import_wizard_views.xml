@@ -5,16 +5,20 @@
         <field name="name">po.import.wizard.line.tree</field>
         <field name="model">po.import.wizard.line</field>
         <field name="arch" type="xml">
-            <list>
-                <field name="vendor_code"/>
-                <field name="name"/>
-                <field name="barcode"/>
-                <field name="quantity"/>
-                <field name="unit_cost"/>
-                <field name="line_total" sum="Total"/>
-                <field name="product_id" optional="show"/>
-                <field name="status"/>
-                <field name="status_message"/>
+            <list editable="bottom">
+                <field name="vendor_code" readonly="1"/>
+                <field name="name" readonly="1"/>
+                <field name="barcode" readonly="1"/>
+                <field name="quantity" readonly="1"/>
+                <field name="unit_cost" readonly="1"/>
+                <field name="current_cost" readonly="1" optional="show" string="Old Cost"/>
+                <field name="current_sale_price" readonly="1" optional="show" string="Old Price"/>
+                <field name="margin_percent" string="Margin %"/>
+                <field name="sale_price" string="New Price"/>
+                <field name="update_price" string="Update"/>
+                <field name="product_id" readonly="1" optional="hide"/>
+                <field name="status" readonly="1"/>
+                <field name="status_message" readonly="1" optional="hide"/>
             </list>
         </field>
     </record>
@@ -34,10 +38,14 @@
                     <group string="Vendor">
                         <field name="vendor_id" options="{'no_create': True}"/>
                     </group>
-                    <group string="Import Options" col="2">
+                    <group string="Product Options" col="2">
                         <field name="create_missing_products"/>
-                        <field name="update_vendor_pricelist"/>
                         <field name="normalize_barcodes"/>
+                        <field name="update_vendor_pricelist"/>
+                        <field name="update_product_prices"/>
+                        <field name="default_margin" invisible="not update_product_prices and not create_missing_products"/>
+                    </group>
+                    <group string="PO Options" col="2">
                         <field name="auto_confirm_po"/>
                     </group>
                     <group string="CSV Template Format" col="1">
@@ -66,7 +74,14 @@
                             <span class="badge bg-danger">❌ Errors: <field name="preview_count_error" nolabel="1" class="oe_inline"/></span>
                         </div>
                     </group>
-                    <group string="Preview Lines" col="1">
+                    <group string="Price Update Options" col="2">
+                        <field name="update_product_prices"/>
+                        <field name="default_margin"/>
+                    </group>
+                    <group string="Preview Lines - Edit Margin/Price as needed" col="1">
+                        <p class="text-muted">
+                            <em>Edit <strong>Margin %</strong> or <strong>New Price</strong> for each line. Check <strong>Update</strong> to update product prices.</em>
+                        </p>
                         <field name="preview_line_ids" nolabel="1" widget="one2many"/>
                     </group>
                 </group>
