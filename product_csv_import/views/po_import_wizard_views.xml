@@ -5,7 +5,7 @@
         <field name="name">po.import.wizard.line.tree</field>
         <field name="model">po.import.wizard.line</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="vendor_code"/>
                 <field name="name"/>
                 <field name="barcode"/>
@@ -15,7 +15,7 @@
                 <field name="product_id" optional="show"/>
                 <field name="status"/>
                 <field name="status_message"/>
-            </tree>
+            </list>
         </field>
     </record>
 
