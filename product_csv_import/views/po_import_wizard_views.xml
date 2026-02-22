@@ -48,8 +48,8 @@
                     </group>
                     <group string="Preview Lines" col="1">
                         <field name="preview_line_ids" nolabel="1">
-                            <tree decoration-success="status == 'matched'" decoration-info="status == 'new'" decoration-danger="status == 'error'" editable="bottom">
-                                <field name="status" column_invisible="1"/>
+                            <tree decoration-success="status == 'matched'" decoration-info="status == 'new'" decoration-danger="status == 'error'">
+                                <field name="status" invisible="1"/>
                                 <field name="vendor_code"/>
                                 <field name="name"/>
                                 <field name="barcode"/>
