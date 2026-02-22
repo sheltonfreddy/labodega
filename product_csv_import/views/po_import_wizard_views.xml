@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- PO Import Wizard Line Tree View -->
+    <record id="view_po_import_wizard_line_tree" model="ir.ui.view">
+        <field name="name">po.import.wizard.line.tree</field>
+        <field name="model">po.import.wizard.line</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="vendor_code"/>
+                <field name="name"/>
+                <field name="barcode"/>
+                <field name="quantity"/>
+                <field name="unit_cost"/>
+                <field name="line_total" sum="Total"/>
+                <field name="product_id" optional="show"/>
+                <field name="status"/>
+                <field name="status_message"/>
+            </tree>
+        </field>
+    </record>
+
     <!-- PO Import Wizard Form View -->
     <record id="view_po_import_wizard_form" model="ir.ui.view">
         <field name="name">po.import.wizard.form</field>
@@ -47,19 +66,7 @@
                         </div>
                     </group>
                     <group string="Preview Lines" col="1">
-                        <field name="preview_line_ids" nolabel="1">
-                            <tree>
-                                <field name="vendor_code"/>
-                                <field name="name"/>
-                                <field name="barcode"/>
-                                <field name="quantity"/>
-                                <field name="unit_cost"/>
-                                <field name="line_total" sum="Total"/>
-                                <field name="product_id" optional="show"/>
-                                <field name="status"/>
-                                <field name="status_message"/>
-                            </tree>
-                        </field>
+                        <field name="preview_line_ids" nolabel="1" widget="one2many"/>
                     </group>
                 </group>
 
