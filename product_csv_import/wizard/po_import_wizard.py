@@ -17,6 +17,19 @@ class POImportWizardLine(models.TransientModel):
     unit_cost = fields.Float(string='Unit Cost')
     line_total = fields.Float(string='Total', compute='_compute_line_total')
     product_id = fields.Many2one('product.product', string='Matched Product')
+
+    # Price and Margin fields
+    current_cost = fields.Float(string='Current Cost', readonly=True,
+                                 help='Current cost in Odoo')
+    current_sale_price = fields.Float(string='Current Sale Price', readonly=True,
+                                       help='Current sale price in Odoo')
+    sale_price = fields.Float(string='New Sale Price',
+                              help='Sale price to set (leave 0 to keep existing)')
+    margin_percent = fields.Float(string='Margin %',
+                                  help='Margin percentage (edit to recalculate sale price)')
+    update_price = fields.Boolean(string='Update', default=False,
+                                  help='Check to update cost and sale price for this product')
+
     status = fields.Selection([
         ('matched', 'Matched'),
         ('new', 'Will Create'),
@@ -28,6 +41,33 @@ class POImportWizardLine(models.TransientModel):
     def _compute_line_total(self):
         for line in self:
             line.line_total = line.quantity * line.unit_cost
+
+    @api.onchange('margin_percent')
+    def _onchange_margin_percent(self):
+        """Recalculate sale price when margin is changed"""
+        if self.unit_cost and self.margin_percent:
+            # Sale Price = Cost / (1 - Margin%)
+            # e.g., Cost $10, Margin 30% → Price = 10 / (1 - 0.30) = $14.29
+            if self.margin_percent < 100:
+                self.sale_price = self.unit_cost / (1 - self.margin_percent / 100)
+            self.update_price = True
+
+    @api.onchange('sale_price')
+    def _onchange_sale_price(self):
+        """Recalculate margin when sale price is changed"""
+        if self.sale_price and self.unit_cost and self.sale_price > 0:
+            # Margin% = (Price - Cost) / Price * 100
+            self.margin_percent = ((self.sale_price - self.unit_cost) / self.sale_price) * 100
+            self.update_price = True
+
+    @api.onchange('update_price')
+    def _onchange_update_price(self):
+        """When update_price is checked, calculate margin if not set"""
+        if self.update_price and not self.sale_price and self.unit_cost:
+            # Default to 30% margin if no sale price set
+            default_margin = self.wizard_id.default_margin or 30.0
+            self.margin_percent = default_margin
+            self.sale_price = self.unit_cost / (1 - default_margin / 100)
 
 
 class POImportWizard(models.TransientModel):
@@ -53,6 +93,14 @@ class POImportWizard(models.TransientModel):
         string='Normalize Barcodes',
         default=True,
         help='If checked, update product barcodes to normalized format (10-digit vendor format)')
+    update_product_prices = fields.Boolean(
+        string='Update Product Prices',
+        default=False,
+        help='If checked, update product cost and sale price for lines marked "Update"')
+    default_margin = fields.Float(
+        string='Default Margin %',
+        default=30.0,
+        help='Default margin percentage for new products or when calculating sale price')
     auto_confirm_po = fields.Boolean(
         string='Auto Confirm PO',
         default=False,
@@ -377,12 +425,41 @@ class POImportWizard(models.TransientModel):
                         status_message = f'Matched: {product.display_name} (barcode will normalize: {product.barcode} → {normalized})'
                     else:
                         status_message = f'Matched: {product.display_name}'
+
+                    # Get current pricing info
+                    current_cost = product.standard_price or 0.0
+                    current_sale_price = product.list_price or 0.0
+
+                    # Calculate current margin if both prices exist
+                    if current_sale_price > 0 and current_cost > 0:
+                        current_margin = ((current_sale_price - current_cost) / current_sale_price) * 100
+                    else:
+                        current_margin = self.default_margin
+
+                    # For preview, show what the new sale price would be using existing margin
+                    if unit_cost > 0 and current_margin > 0 and current_margin < 100:
+                        new_sale_price = unit_cost / (1 - current_margin / 100)
+                    else:
+                        new_sale_price = current_sale_price
+
                 elif self.create_missing_products:
                     status = 'new'
                     status_message = 'Will create new product'
+                    current_cost = 0.0
+                    current_sale_price = 0.0
+                    current_margin = self.default_margin
+                    # Calculate sale price for new product using default margin
+                    if unit_cost > 0 and current_margin < 100:
+                        new_sale_price = unit_cost / (1 - current_margin / 100)
+                    else:
+                        new_sale_price = 0.0
                 else:
                     status = 'error'
                     status_message = 'Product not found (creation disabled)'
+                    current_cost = 0.0
+                    current_sale_price = 0.0
+                    current_margin = 0.0
+                    new_sale_price = 0.0
 
                 preview_lines.append({
                     'wizard_id': self.id,
@@ -392,6 +469,11 @@ class POImportWizard(models.TransientModel):
                     'quantity': qty,
                     'unit_cost': unit_cost,
                     'product_id': product.id if product else False,
+                    'current_cost': current_cost,
+                    'current_sale_price': current_sale_price,
+                    'sale_price': new_sale_price,
+                    'margin_percent': current_margin,
+                    'update_price': status == 'new',  # Auto-check for new products
                     'status': status,
                     'status_message': status_message,
                 })
@@ -421,24 +503,17 @@ class POImportWizard(models.TransientModel):
         }
 
     def action_import(self):
-        """Import PO from CSV"""
+        """Import PO from preview lines (with user-edited margins/prices)"""
         self.ensure_one()
 
-        if not self.csv_file:
-            raise UserError(_('Please upload a CSV file.'))
-
-        # Decode the CSV file
-        csv_data = base64.b64decode(self.csv_file)
-        csv_file = io.StringIO(csv_data.decode('utf-8'))
-        reader = csv.reader(csv_file)
-
-        # Skip header row
-        next(reader, None)
+        if not self.preview_line_ids:
+            raise UserError(_('No preview lines found. Please preview the import first.'))
 
         # Statistics
         products_created = 0
         products_matched = 0
         barcodes_normalized = 0
+        prices_updated = 0
         vendor_prices_updated = 0
         skipped = 0
         errors = []
@@ -446,46 +521,44 @@ class POImportWizard(models.TransientModel):
         # PO lines to create
         po_lines = []
 
-        for row_num, row in enumerate(reader, start=2):
+        for line in self.preview_line_ids:
             try:
-                if len(row) < 4:  # Minimum: vendor_code, name, barcode, qty
+                if line.status == 'error':
                     skipped += 1
                     continue
 
-                vendor_code = self._clean_text(row[self.COL_VENDOR_CODE])
-                name = self._clean_text(row[self.COL_NAME])
-                barcode = self._clean_barcode(row[self.COL_BARCODE])
-                qty = self._clean_qty(row[self.COL_QTY])
-                unit_cost = self._clean_price(row[self.COL_UNIT_COST]) if len(row) > self.COL_UNIT_COST else 0.0
+                product = line.product_id
+                barcode = line.barcode
+                vendor_code = line.vendor_code
+                name = line.name
+                qty = line.quantity
+                unit_cost = line.unit_cost
 
-                # Skip rows without name
-                if not name:
-                    skipped += 1
-                    continue
+                # Handle product creation or matching
+                if line.status == 'new' and not product:
+                    # Normalize barcode before creating new product
+                    normalized_barcode = self._normalize_upc_barcode(barcode) if barcode else barcode
 
-                # Find product: First by barcode, then by vendor code
-                product = None
-
-                if barcode:
-                    product, matched_variant = self._find_product_by_barcode(barcode)
+                    # Create product with sale price from preview line
+                    product = self._create_product_with_price(
+                        name, normalized_barcode, unit_cost,
+                        line.sale_price, vendor_code
+                    )
+                    products_created += 1
+                elif product:
+                    products_matched += 1
 
                     # Normalize barcode if option is enabled
-                    if product and self.normalize_barcodes:
+                    if self.normalize_barcodes and barcode:
                         if self._normalize_product_barcode(product, barcode):
                             barcodes_normalized += 1
 
-                if not product and vendor_code:
-                    product = self._find_product_by_vendor_code(vendor_code, self.vendor_id.id)
-
-                if product:
-                    products_matched += 1
-                elif self.create_missing_products:
-                    # Normalize barcode before creating new product
-                    normalized_barcode = self._normalize_upc_barcode(barcode) if barcode else barcode
-                    product = self._create_product(name, normalized_barcode, unit_cost, vendor_code)
-                    products_created += 1
+                    # Update product prices if marked for update
+                    if self.update_product_prices and line.update_price:
+                        if self._update_product_prices(product, unit_cost, line.sale_price):
+                            prices_updated += 1
                 else:
-                    errors.append(f"Row {row_num}: Product not found - {name} (Barcode: {barcode})")
+                    errors.append(f"Line {line.name}: Product not found")
                     skipped += 1
                     continue
 
@@ -504,7 +577,7 @@ class POImportWizard(models.TransientModel):
                     })
 
             except Exception as e:
-                errors.append(f"Row {row_num}: {str(e)}")
+                errors.append(f"Line {line.name}: {str(e)}")
 
         # Create Purchase Order
         po = None
@@ -530,6 +603,7 @@ class POImportWizard(models.TransientModel):
             f"✅ Products Matched: {products_matched}",
             f"✅ Products Created: {products_created}",
             f"🔄 Barcodes Normalized: {barcodes_normalized}",
+            f"💲 Prices Updated: {prices_updated}",
             f"💰 Vendor Prices Updated: {vendor_prices_updated}",
             f"⏭️  Rows Skipped: {skipped}",
         ]
@@ -551,6 +625,35 @@ class POImportWizard(models.TransientModel):
             'view_mode': 'form',
             'target': 'new',
         }
+
+    def _create_product_with_price(self, name, barcode, cost, sale_price, vendor_code):
+        """Create a new product with cost and sale price"""
+        vals = {
+            'name': name,
+            'barcode': barcode if barcode else False,
+            'type': 'consu',
+            'standard_price': cost,
+            'list_price': sale_price if sale_price else cost,
+            'available_in_pos': True,
+            'default_code': vendor_code if not barcode else False,
+        }
+        return self.env['product.product'].create(vals)
+
+    def _update_product_prices(self, product, cost, sale_price):
+        """Update product cost and sale price. Returns True if updated."""
+        if not product:
+            return False
+
+        updates = {}
+        if cost and cost != product.standard_price:
+            updates['standard_price'] = cost
+        if sale_price and sale_price != product.list_price:
+            updates['list_price'] = sale_price
+
+        if updates:
+            product.write(updates)
+            return True
+        return False
 
     def action_view_po(self):
         """Open the created PO"""
