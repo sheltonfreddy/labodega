@@ -1,25 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- PO Import Wizard Line Tree View -->
+    <!-- PO Import Wizard Line Tree View - Simplified -->
     <record id="view_po_import_wizard_line_tree" model="ir.ui.view">
         <field name="name">po.import.wizard.line.tree</field>
         <field name="model">po.import.wizard.line</field>
         <field name="arch" type="xml">
             <list editable="bottom">
-                <field name="vendor_code" readonly="1"/>
-                <field name="name" readonly="1"/>
-                <field name="barcode" readonly="1"/>
-                <field name="quantity" readonly="1"/>
-                <field name="unit_cost" readonly="1"/>
-                <field name="current_cost" readonly="1" optional="show" string="Old Cost"/>
-                <field name="current_sale_price" readonly="1" optional="show" string="Old Price"/>
-                <field name="margin_percent" string="Margin %"/>
-                <field name="sale_price" string="New Price"/>
-                <field name="category_id" string="Category" optional="show"/>
-                <field name="pos_category_id" string="POS Category" optional="show"/>
-                <field name="update_price" string="Update"/>
+                <!-- Essential columns - always visible -->
+                <field name="name" readonly="1" string="Product"/>
+                <field name="barcode" readonly="1" optional="hide"/>
+                <field name="quantity" readonly="1" string="Qty" width="60px"/>
+                <field name="unit_cost" readonly="1" string="Cost" width="80px"/>
+                <field name="margin_percent" string="Margin %" width="80px"/>
+                <field name="sale_price" string="Sale Price" width="90px"/>
+                <field name="update_price" string="Update" width="60px"/>
+                <field name="status" readonly="1" width="80px"/>
+
+                <!-- Optional columns - hidden by default -->
+                <field name="vendor_code" readonly="1" optional="hide"/>
+                <field name="current_cost" readonly="1" optional="hide" string="Old Cost"/>
+                <field name="current_sale_price" readonly="1" optional="hide" string="Old Price"/>
+                <field name="category_id" string="Category" optional="hide"/>
+                <field name="pos_category_id" string="POS Cat" optional="hide"/>
                 <field name="product_id" readonly="1" optional="hide"/>
-                <field name="status" readonly="1"/>
                 <field name="status_message" readonly="1" optional="hide"/>
             </list>
         </field>
@@ -68,27 +71,50 @@
                 </group>
 
                 <!-- PREVIEW STATE - Review before import -->
-                <group invisible="state != 'preview'">
-                    <group string="Import Summary" col="4">
-                        <field name="vendor_id" readonly="1"/>
-                        <field name="preview_total" widget="monetary"/>
+                <sheet invisible="state != 'preview'">
+                    <div class="oe_title">
+                        <h2>Preview Import for <field name="vendor_id" readonly="1" class="oe_inline" options="{'no_open': True}"/></h2>
+                    </div>
+                    <group col="4">
+                        <field name="preview_total" widget="monetary" string="PO Total"/>
+                        <field name="update_product_prices"/>
+                        <field name="default_margin" invisible="not update_product_prices"/>
                         <div class="text-center">
-                            <span class="badge bg-success me-1">✅ Matched: <field name="preview_count_matched" nolabel="1" class="oe_inline"/></span>
-                            <span class="badge bg-primary me-1">🆕 New: <field name="preview_count_new" nolabel="1" class="oe_inline"/></span>
-                            <span class="badge bg-danger">❌ Errors: <field name="preview_count_error" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-success me-1">✅ <field name="preview_count_matched" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-primary me-1">🆕 <field name="preview_count_new" nolabel="1" class="oe_inline"/></span>
+                            <span class="badge bg-danger">❌ <field name="preview_count_error" nolabel="1" class="oe_inline"/></span>
                         </div>
                     </group>
-                    <group string="Price Update Options" col="2">
-                        <field name="update_product_prices"/>
-                        <field name="default_margin"/>
-                    </group>
-                    <group string="Preview Lines - Edit Margin/Price as needed" col="1">
-                        <p class="text-muted">
-                            <em>Edit <strong>Margin %</strong> or <strong>New Price</strong> for each line. Check <strong>Update</strong> to update product prices.</em>
-                        </p>
-                        <field name="preview_line_ids" nolabel="1" widget="one2many"/>
-                    </group>
-                </group>
+                    <notebook>
+                        <page string="Products" name="products">
+                            <field name="preview_line_ids" nolabel="1" widget="one2many">
+                                <list editable="bottom">
+                                    <field name="name" readonly="1" string="Product"/>
+                                    <field name="quantity" readonly="1" string="Qty" width="50px"/>
+                                    <field name="unit_cost" readonly="1" string="Cost" width="70px"/>
+                                    <field name="margin_percent" string="Margin %" width="70px"/>
+                                    <field name="sale_price" string="Price" width="70px"/>
+                                    <field name="update_price" string="Upd" width="40px"/>
+                                    <field name="status" readonly="1" width="70px"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Details" name="details">
+                            <field name="preview_line_ids" nolabel="1" widget="one2many">
+                                <list editable="bottom">
+                                    <field name="name" readonly="1" string="Product"/>
+                                    <field name="barcode" readonly="1"/>
+                                    <field name="vendor_code" readonly="1"/>
+                                    <field name="category_id" string="Category"/>
+                                    <field name="pos_category_id" string="POS Cat"/>
+                                    <field name="current_cost" readonly="1" string="Old Cost"/>
+                                    <field name="current_sale_price" readonly="1" string="Old Price"/>
+                                    <field name="status_message" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
 
                 <!-- DONE STATE - Results -->
                 <group invisible="state != 'done'">
@@ -103,7 +129,7 @@
                             class="btn-primary" invisible="state != 'draft'"/>
 
                     <!-- Preview state buttons -->
-                    <button name="action_import" string="Confirm &amp; Create PO" type="object"
+                    <button name="action_import" string="✓ Create PO" type="object"
                             class="btn-success" invisible="state != 'preview'"/>
                     <button name="action_back_to_draft" string="← Back" type="object"
                             class="btn-secondary" invisible="state != 'preview'"/>
