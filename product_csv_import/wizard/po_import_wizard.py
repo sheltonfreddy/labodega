@@ -49,6 +49,10 @@ class POImportWizard(models.TransientModel):
         string='Update Vendor Pricelist',
         default=True,
         help='Update/Create vendor-specific pricing (product.supplierinfo)')
+    normalize_barcodes = fields.Boolean(
+        string='Normalize Barcodes',
+        default=True,
+        help='If checked, update product barcodes to normalized format (10-digit vendor format)')
     auto_confirm_po = fields.Boolean(
         string='Auto Confirm PO',
         default=False,
@@ -121,11 +125,149 @@ class POImportWizard(models.TransientModel):
             return ''
         return ' '.join(str(text_str).split())
 
+    # ========================================================================
+    # Barcode Normalization Functions (from scale_bridge.py)
+    # ========================================================================
+
+    def _calculate_upc_check_digit(self, barcode):
+        """
+        Calculate UPC/EAN check digit using Modulo 10 algorithm.
+        Works for UPC-A (11 digits input) and EAN-13 (12 digits input).
+        """
+        if not barcode or not barcode.isdigit():
+            return ""
+
+        total = 0
+        for i, digit in enumerate(barcode):
+            if i % 2 == 0:
+                total += int(digit) * 3
+            else:
+                total += int(digit)
+
+        check = (10 - (total % 10)) % 10
+        return str(check)
+
+    def _normalize_upc_barcode(self, barcode):
+        """
+        Normalize UPC/EAN barcodes to match Odoo product barcodes.
+        Matches vendor format: strip leading zeros, no check digit.
+        """
+        if not barcode or not barcode.isdigit():
+            return barcode
+
+        length = len(barcode)
+
+        # Handle scanners that omit check digit (send 11 digits instead of 12)
+        if length == 11:
+            check = self._calculate_upc_check_digit(barcode)
+            barcode = barcode + check
+            length = 12
+
+        # Match vendor format: strip leading zeros, no check digit
+        # 12 digits (full UPC) starting with 0 → strip to 10 digits
+        if length == 12 and barcode.startswith('0'):
+            return barcode[1:11]  # Remove leading 0 and check digit
+
+        # 11 digits starting with 0 → strip to 10 digits
+        if length == 11 and barcode.startswith('0'):
+            return barcode[1:]  # Remove leading 0
+
+        return barcode
+
+    def _generate_barcode_variants(self, barcode):
+        """
+        Generate possible barcode variants to search in Odoo.
+        This helps find products that may have been imported with different formats.
+        """
+        if not barcode or not barcode.isdigit():
+            return [barcode] if barcode else []
+
+        variants = []
+        length = len(barcode)
+
+        # Original
+        variants.append(barcode)
+
+        # For 10-digit barcodes, try with leading zero (11 digits) and full UPC (12 digits)
+        if length == 10:
+            with_zero = '0' + barcode
+            variants.append(with_zero)
+            check = self._calculate_upc_check_digit(with_zero)
+            variants.append(with_zero + check)  # Full 12-digit UPC
+
+        # For 11-digit barcodes, try with and without check digit
+        elif length == 11:
+            check = self._calculate_upc_check_digit(barcode)
+            variants.append(barcode + check)  # Add check digit
+            if barcode.startswith('0'):
+                variants.append(barcode[1:])  # Strip leading zero
+
+        # For 12-digit barcodes starting with 0, try 10 and 11 digit versions
+        elif length == 12 and barcode.startswith('0'):
+            variants.append(barcode[1:])  # 11 digits
+            variants.append(barcode[1:11])  # 10 digits (vendor format)
+
+        # For 14-digit ITF-14 barcodes, try the inner UPC
+        elif length == 14:
+            inner_11 = barcode[2:13]
+            variants.append(inner_11)
+            check = self._calculate_upc_check_digit(inner_11)
+            variants.append(inner_11 + check)  # 12-digit UPC
+            if inner_11.startswith('0'):
+                variants.append(inner_11[1:])  # 10-digit vendor format
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_variants = []
+        for v in variants:
+            if v not in seen:
+                seen.add(v)
+                unique_variants.append(v)
+
+        return unique_variants
+
     def _find_product_by_barcode(self, barcode):
-        """Find product by barcode"""
+        """Find product by barcode, trying all normalized variants.
+        Returns tuple: (product, matched_barcode_variant)
+        """
         if not barcode:
-            return None
-        return self.env['product.product'].search([('barcode', '=', barcode)], limit=1)
+            return None, None
+
+        # Generate all possible barcode variants
+        variants = self._generate_barcode_variants(barcode)
+
+        # Search for product with any variant
+        for variant in variants:
+            product = self.env['product.product'].search([('barcode', '=', variant)], limit=1)
+            if product:
+                return product, variant
+
+        return None, None
+
+    def _normalize_product_barcode(self, product, original_barcode):
+        """
+        Normalize the product's barcode to vendor format (10-digit).
+        Only updates if the current barcode is different from normalized.
+        Returns True if barcode was updated, False otherwise.
+        """
+        if not product or not original_barcode:
+            return False
+
+        normalized = self._normalize_upc_barcode(original_barcode)
+
+        # Only update if different and normalized is valid
+        if normalized and normalized != product.barcode and normalized.isdigit():
+            # Check no other product has this normalized barcode
+            existing = self.env['product.product'].search([
+                ('barcode', '=', normalized),
+                ('id', '!=', product.id)
+            ], limit=1)
+
+            if not existing:
+                product.write({'barcode': normalized})
+                return True
+
+        return False
 
     def _find_product_by_vendor_code(self, vendor_code, vendor_id):
         """Find product by vendor code in supplierinfo"""
@@ -218,18 +360,23 @@ class POImportWizard(models.TransientModel):
 
                 # Find product
                 product = None
+                matched_variant = None
                 status = 'error'
                 status_message = 'Product not found'
 
                 if barcode:
-                    product = self._find_product_by_barcode(barcode)
+                    product, matched_variant = self._find_product_by_barcode(barcode)
 
                 if not product and vendor_code:
                     product = self._find_product_by_vendor_code(vendor_code, self.vendor_id.id)
 
                 if product:
                     status = 'matched'
-                    status_message = f'Matched: {product.display_name}'
+                    normalized = self._normalize_upc_barcode(barcode) if barcode else None
+                    if self.normalize_barcodes and normalized and product.barcode != normalized:
+                        status_message = f'Matched: {product.display_name} (barcode will normalize: {product.barcode} → {normalized})'
+                    else:
+                        status_message = f'Matched: {product.display_name}'
                 elif self.create_missing_products:
                     status = 'new'
                     status_message = 'Will create new product'
@@ -291,6 +438,7 @@ class POImportWizard(models.TransientModel):
         # Statistics
         products_created = 0
         products_matched = 0
+        barcodes_normalized = 0
         vendor_prices_updated = 0
         skipped = 0
         errors = []
@@ -319,7 +467,12 @@ class POImportWizard(models.TransientModel):
                 product = None
 
                 if barcode:
-                    product = self._find_product_by_barcode(barcode)
+                    product, matched_variant = self._find_product_by_barcode(barcode)
+
+                    # Normalize barcode if option is enabled
+                    if product and self.normalize_barcodes:
+                        if self._normalize_product_barcode(product, barcode):
+                            barcodes_normalized += 1
 
                 if not product and vendor_code:
                     product = self._find_product_by_vendor_code(vendor_code, self.vendor_id.id)
@@ -327,7 +480,9 @@ class POImportWizard(models.TransientModel):
                 if product:
                     products_matched += 1
                 elif self.create_missing_products:
-                    product = self._create_product(name, barcode, unit_cost, vendor_code)
+                    # Normalize barcode before creating new product
+                    normalized_barcode = self._normalize_upc_barcode(barcode) if barcode else barcode
+                    product = self._create_product(name, normalized_barcode, unit_cost, vendor_code)
                     products_created += 1
                 else:
                     errors.append(f"Row {row_num}: Product not found - {name} (Barcode: {barcode})")
@@ -374,6 +529,7 @@ class POImportWizard(models.TransientModel):
             "",
             f"✅ Products Matched: {products_matched}",
             f"✅ Products Created: {products_created}",
+            f"🔄 Barcodes Normalized: {barcodes_normalized}",
             f"💰 Vendor Prices Updated: {vendor_prices_updated}",
             f"⏭️  Rows Skipped: {skipped}",
         ]

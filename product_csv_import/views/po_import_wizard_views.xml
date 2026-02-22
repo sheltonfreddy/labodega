@@ -37,6 +37,7 @@
                     <group string="Import Options" col="2">
                         <field name="create_missing_products"/>
                         <field name="update_vendor_pricelist"/>
+                        <field name="normalize_barcodes"/>
                         <field name="auto_confirm_po"/>
                     </group>
                     <group string="CSV Template Format" col="1">
