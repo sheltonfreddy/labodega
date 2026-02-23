@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pos_sales_summary_wizard,pos.sales.summary.wizard,model_pos_sales_summary_wizard,point_of_sale.group_pos_user,1,1,1,1
+access_pos_sales_summary_wizard_session_line,pos.sales.summary.wizard.session.line,model_pos_sales_summary_wizard_session_line,point_of_sale.group_pos_user,1,1,1,1
+access_pos_sales_summary_wizard_product_line,pos.sales.summary.wizard.product.line,model_pos_sales_summary_wizard_product_line,point_of_sale.group_pos_user,1,1,1,1
+access_pos_sales_summary_report,report.labodega_pos.pos_sales_summary,model_report_labodega_pos_pos_sales_summary,point_of_sale.group_pos_user,1,0,0,0

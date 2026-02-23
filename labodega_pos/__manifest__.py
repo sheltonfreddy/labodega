@@ -1,12 +1,15 @@
 {
     "name": "POS Magellan Scale Integration",
-    "version": "18.0.1.1.2",  # Simplified user restriction rule
+    "version": "18.0.1.2.0",  # Added POS Sales Summary Report
     "depends": ["point_of_sale"],
     "author": "Shelton / Labodega",
     "category": "Point of Sale",
     "data": [
+        "security/ir.model.access.csv",
         "security/pos_security.xml",
         "views/pos_config_views.xml",
+        "views/pos_sales_summary_views.xml",
+        "report/pos_sales_summary_template.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [

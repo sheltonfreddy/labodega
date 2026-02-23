@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Wizard Form View -->
+    <record id="view_pos_sales_summary_wizard_form" model="ir.ui.view">
+        <field name="name">pos.sales.summary.wizard.form</field>
+        <field name="model">pos.sales.summary.wizard</field>
+        <field name="arch" type="xml">
+            <form string="POS Sales Summary">
+                <group>
+                    <field name="report_date" readonly="1"/>
+                </group>
+                <notebook>
+                    <!-- Today's Sessions Summary -->
+                    <page string="Today's Sessions" name="sessions">
+                        <group string="Today's Summary">
+                            <field name="total_sales_today"/>
+                            <field name="total_orders_today"/>
+                            <field name="total_refunds_today"/>
+                        </group>
+                        <field name="session_line_ids" nolabel="1">
+                            <tree string="Sessions">
+                                <field name="session_name"/>
+                                <field name="config_name"/>
+                                <field name="user_name"/>
+                                <field name="state"/>
+                                <field name="start_at"/>
+                                <field name="total_orders"/>
+                                <field name="total_sales" sum="Total"/>
+                            </tree>
+                        </field>
+                    </page>
+
+                    <!-- Top 20 Today -->
+                    <page string="Top 20 Today" name="top_today">
+                        <field name="top_products_today_ids" nolabel="1">
+                            <tree string="Top Products Today">
+                                <field name="rank"/>
+                                <field name="product_name"/>
+                                <field name="total_qty"/>
+                                <field name="total_amount" sum="Total"/>
+                            </tree>
+                        </field>
+                    </page>
+
+                    <!-- Top 20 This Month -->
+                    <page string="Top 20 This Month" name="top_month">
+                        <field name="month_name" invisible="1"/>
+                        <div class="text-muted mb-2">
+                            Sales for: <field name="month_name" readonly="1" nolabel="1" class="oe_inline"/>
+                        </div>
+                        <field name="top_products_month_ids" nolabel="1">
+                            <tree string="Top Products This Month">
+                                <field name="rank"/>
+                                <field name="product_name"/>
+                                <field name="total_qty"/>
+                                <field name="total_amount" sum="Total"/>
+                            </tree>
+                        </field>
+                    </page>
+
+                    <!-- Top 20 This Year -->
+                    <page string="Top 20 This Year" name="top_year">
+                        <field name="year_name" invisible="1"/>
+                        <div class="text-muted mb-2">
+                            Sales for year: <field name="year_name" readonly="1" nolabel="1" class="oe_inline"/>
+                        </div>
+                        <field name="top_products_year_ids" nolabel="1">
+                            <tree string="Top Products This Year">
+                                <field name="rank"/>
+                                <field name="product_name"/>
+                                <field name="total_qty"/>
+                                <field name="total_amount" sum="Total"/>
+                            </tree>
+                        </field>
+                    </page>
+                </notebook>
+                <footer>
+                    <button string="Refresh" name="action_refresh" type="object" class="btn-primary"/>
+                    <button string="Print Report" name="action_print_report" type="object" class="btn-secondary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Wizard Action -->
+    <record id="action_pos_sales_summary_wizard" model="ir.actions.act_window">
+        <field name="name">POS Sales Summary</field>
+        <field name="res_model">pos.sales.summary.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_auto_load': True}</field>
+    </record>
+
+    <!-- Menu Item under Point of Sale > Reporting -->
+    <menuitem id="menu_pos_sales_summary"
+              name="Sales Summary"
+              parent="point_of_sale.menu_point_rep"
+              action="action_pos_sales_summary_wizard"
+              sequence="5"/>
+
+</odoo>
+
