@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Tree view for Session Lines -->
+    <!-- List view for Session Lines -->
     <record id="view_pos_sales_summary_session_line_tree" model="ir.ui.view">
-        <field name="name">pos.sales.summary.wizard.session.line.tree</field>
+        <field name="name">pos.sales.summary.wizard.session.line.list</field>
         <field name="model">pos.sales.summary.wizard.session.line</field>
         <field name="arch" type="xml">
-            <tree string="Sessions" create="false" delete="false">
+            <list string="Sessions" create="false" delete="false">
                 <field name="session_name"/>
                 <field name="config_name"/>
                 <field name="user_name"/>
@@ -13,21 +13,21 @@
                 <field name="start_at"/>
                 <field name="total_orders"/>
                 <field name="total_sales" sum="Total"/>
-            </tree>
+            </list>
         </field>
     </record>
 
-    <!-- Tree view for Product Lines -->
+    <!-- List view for Product Lines -->
     <record id="view_pos_sales_summary_product_line_tree" model="ir.ui.view">
-        <field name="name">pos.sales.summary.wizard.product.line.tree</field>
+        <field name="name">pos.sales.summary.wizard.product.line.list</field>
         <field name="model">pos.sales.summary.wizard.product.line</field>
         <field name="arch" type="xml">
-            <tree string="Top Products" create="false" delete="false">
+            <list string="Top Products" create="false" delete="false">
                 <field name="rank"/>
                 <field name="product_name"/>
                 <field name="total_qty" sum="Total Qty"/>
                 <field name="total_amount" sum="Total"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -100,5 +100,6 @@
               sequence="5"/>
 
 </odoo>
+
 
 
