@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Labodega Restaurant POS
+Comment=Launches Odoo POS in kiosk mode
+Exec=/home/labodega_res/kiosk-launcher.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=5
+

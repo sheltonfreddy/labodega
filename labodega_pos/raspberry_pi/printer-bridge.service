@@ -1,0 +1,18 @@
+[Unit]
+Description=Epson Printer Bridge for Odoo POS
+After=network.target
+
+[Service]
+Type=simple
+User=labodega_res
+WorkingDirectory=/home/labodega_res
+ExecStart=/usr/bin/python3 /home/labodega_res/printer_bridge.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+

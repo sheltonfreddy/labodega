@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Labodega Restaurant
+Comment=Open Odoo Restaurant POS
+Exec=/home/labodega_res/kiosk-launcher.sh
+Icon=google-chrome
+Terminal=false
+Categories=Application;
+
