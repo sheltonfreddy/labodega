@@ -154,7 +154,9 @@ class PosSalesSummaryWizard(models.TransientModel):
         year_start, year_stop = self._get_year_range()
 
         # Get today's sessions
-        sessions = self.env['pos.session'].search([
+        # Use sudo() to bypass POS config user restrictions for reporting purposes
+        # The report needs to show all sessions regardless of terminal access
+        sessions = self.env['pos.session'].sudo().search([
             ('start_at', '>=', today_start),
             ('start_at', '<', today_stop),
         ], order='start_at desc')
@@ -165,7 +167,7 @@ class PosSalesSummaryWizard(models.TransientModel):
         total_refunds = 0
 
         for session in sessions:
-            orders = self.env['pos.order'].search([
+            orders = self.env['pos.order'].sudo().search([
                 ('session_id', '=', session.id),
                 ('state', 'in', ['paid', 'done', 'invoiced'])
             ])
