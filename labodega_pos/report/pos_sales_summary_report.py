@@ -89,14 +89,16 @@ class PosSalesSummaryReport(models.AbstractModel):
         """Get today's sessions with sales data"""
         date_start, date_stop = self._get_today_range()
 
-        sessions = self.env['pos.session'].search([
+        # Use sudo() to bypass POS config user restrictions for reporting purposes
+        # The report needs to show all sessions regardless of terminal access
+        sessions = self.env['pos.session'].sudo().search([
             ('start_at', '>=', date_start),
             ('start_at', '<', date_stop),
         ], order='start_at desc')
 
         session_data = []
         for session in sessions:
-            orders = self.env['pos.order'].search([
+            orders = self.env['pos.order'].sudo().search([
                 ('session_id', '=', session.id),
                 ('state', 'in', ['paid', 'done', 'invoiced'])
             ])
@@ -130,7 +132,8 @@ class PosSalesSummaryReport(models.AbstractModel):
         """Get today's sales summary"""
         date_start, date_stop = self._get_today_range()
 
-        orders = self.env['pos.order'].search([
+        # Use sudo() to bypass POS config user restrictions for reporting purposes
+        orders = self.env['pos.order'].sudo().search([
             ('date_order', '>=', date_start),
             ('date_order', '<', date_stop),
             ('state', 'in', ['paid', 'done', 'invoiced'])
@@ -147,7 +150,7 @@ class PosSalesSummaryReport(models.AbstractModel):
                 payments[method_name] = payments.get(method_name, 0) + payment.amount
 
         # Get refunds
-        refund_orders = self.env['pos.order'].search([
+        refund_orders = self.env['pos.order'].sudo().search([
             ('date_order', '>=', date_start),
             ('date_order', '<', date_stop),
             ('state', 'in', ['paid', 'done', 'invoiced']),
